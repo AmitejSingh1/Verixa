@@ -1,0 +1,15 @@
+{
+  "_note": "Review checkpoint. Do not use this file for ingestion until the mapping is explicitly confirmed.",
+  "_observed_labels": {
+    "0": "real images",
+    "1": "full synthetic images",
+    "2": "tampered images"
+  },
+  "_recommended_for_binary_detector": {
+    "0": 0,
+    "1": 1
+  },
+  "_excluded_pending_decision": {
+    "2": "tampered images are not cleanly equivalent to fully AI-generated images for the binary REAL vs AI-GENERATED task"
+  }
+}
