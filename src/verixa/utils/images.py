@@ -28,7 +28,7 @@ def resize_and_save_jpeg(
     quality: int = 90,
 ) -> None:
     try:
-        from PIL import Image, ImageOps
+        from PIL import Image
     except ImportError as exc:
         raise RuntimeError("Install pillow before ingesting images.") from exc
 

@@ -1,0 +1,67 @@
+{
+  "pilot_target_total": 8100,
+  "sources": {
+    "CIFAKE": {
+      "source_dataset": "CIFAKE",
+      "origin": "kaggle:birdy654/cifake-real-and-ai-generated-synthetic-images",
+      "target_total": 3000,
+      "classes": {
+        "REAL": 1500,
+        "FAKE": 1500
+      },
+      "mapping": {
+        "REAL": 0,
+        "FAKE": 1
+      },
+      "seed": 1337
+    },
+    "SID_Set": {
+      "source_dataset": "SID_Set",
+      "origin": "hf:saberzl/SID_Set",
+      "split": "train",
+      "target_total": 3000,
+      "classes": {
+        "0": 1500,
+        "1": 1500,
+        "2": "exclude"
+      },
+      "mapping": {
+        "0": 0,
+        "1": 1,
+        "2": "exclude"
+      },
+      "seed": 1337
+    },
+    "WildFake": {
+      "source_dataset": "WildFake",
+      "origin": "modelscope:hy2628982280/WildFake",
+      "target_total": 2100,
+      "real_cap": 1000,
+      "architecture_caps": {
+        "DDPM": 400,
+        "BigGAN": 300,
+        "ADM": 200,
+        "DALLE": 100,
+        "Midjourney": 100
+      },
+      "mapping": {
+        "IsFake=0": 0,
+        "IsFake=1": 1
+      },
+      "seed": 1337
+    }
+  },
+  "standardization": {
+    "dimensions": [224, 224],
+    "format": "JPEG",
+    "quality": 90,
+    "resample": "BICUBIC"
+  },
+  "split": {
+    "seed": 1337,
+    "val_fraction": 0.2,
+    "stratify_by": ["label", "source_dataset", "generator"],
+    "group_by_hash": true,
+    "sort_key": "sha256"
+  }
+}

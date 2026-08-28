@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import csv
-import random
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from tqdm import tqdm
 
-from verixa.data.schema import MANIFEST_COLUMNS, ManifestRow, manifest_path_to_str, parse_binary_label
+from verixa.data.schema import (
+    MANIFEST_COLUMNS,
+    ManifestRow,
+    manifest_path_to_str,
+    parse_binary_label,
+)
 from verixa.utils.hashing import sha256_file
 from verixa.utils.images import save_pil_jpeg
 
@@ -36,7 +40,10 @@ def ingest_hf_streaming_dataset(
         raise RuntimeError("Install datasets before streaming Hugging Face datasets.") from exc
 
     parsed_label_map = _parse_optional_label_map(label_map)
-    target_counts = {label: limit_per_label for label in sorted(set(parsed_label_map.values()))}
+    target_counts = {
+        label: limit_per_label
+        for label in sorted(v for v in set(parsed_label_map.values()) if v is not None)
+    }
     counts: Counter[int] = Counter()
     skipped_source_labels: Counter[str] = Counter()
     corrupt = 0

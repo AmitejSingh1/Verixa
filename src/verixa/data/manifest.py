@@ -65,7 +65,7 @@ def assign_fixed_split(
     stratum_counts: dict[str, dict[str, int]] = {}
 
     for key, stratum_groups in sorted(strata.items()):
-        shuffled = list(stratum_groups)
+        shuffled = sorted(stratum_groups, key=lambda g: g[0]["sha256"])
         rng.shuffle(shuffled)
         val_count = round(len(shuffled) * val_fraction)
         if len(shuffled) > 1:
