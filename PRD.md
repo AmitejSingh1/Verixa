@@ -57,24 +57,21 @@ Verixa is designed as a modular, high-throughput detection component for:
 
 ### 4.1 Training & Validation Sources
 
-| Dataset | Provider / Source | Intended Role | Label Mapping & Filtering |
+| Dataset | Provider / Source | Intended Role | Label Mapping & Status |
 | :--- | :--- | :--- | :--- |
-| **SID_Set** | Hugging Face (`saberzl/SID_Set`) | Diverse authentic & full-synthetic images | `0` $\rightarrow$ **0 (REAL)**<br>`1` $\rightarrow$ **1 (AI-GENERATED)**<br>`2` $\rightarrow$ **EXCLUDE (Tampered)** |
-| **CIFAKE** | Kaggle (`birdy654/cifake-real-and-ai-generated-synthetic-images`) | Balanced baseline volume (CIFAR-10 real vs SD 1.4 fake) | `REAL` $\rightarrow$ **0 (REAL)**<br>`FAKE` $\rightarrow$ **1 (AI-GENERATED)** |
-| **WildFake** | ModelScope (`hy2628982280/WildFake`) | Multi-generator & architectural diversity (GAN, Diffusion) | `IsFake=0` $\rightarrow$ **0 (REAL)**<br>`IsFake=1` $\rightarrow$ **1 (AI-GENERATED)**<br>*Preserve architecture metadata* |
+| **SID_Set** | Hugging Face (`saberzl/SID_Set`) | Diverse authentic photos & modern full-synthetic images | `0` $\rightarrow$ **0 (REAL)**<br>`1` $\rightarrow$ **1 (AI-GENERATED)**<br>`2` $\rightarrow$ **EXCLUDE (Tampered)**<br>*Status: 15,000 images in final dataset* |
+| **CIFAKE** | Kaggle (`birdy654/cifake-real-and-ai-generated-synthetic-images`) | Balanced baseline volume (CIFAR-10 real vs SD 1.4 fake) | `REAL` $\rightarrow$ **0 (REAL)**<br>`FAKE` $\rightarrow$ **1 (AI-GENERATED)**<br>*Status: 15,000 images in final dataset* |
+| **WildFake** | ModelScope (`hy2628982280/WildFake`) | Multi-generator & architectural diversity | **EXCLUDED FROM TRAINING**<br>*Rationale: Stored exclusively as 16–51 GB monolithic zip archives on ModelScope; cannot be streamed or selectively sampled without exceeding local storage budgets.* |
 
 ### 4.2 Held-Out Benchmark (Strictly Isolated)
 - **Authentic (non-AIGC):** COCO val2017
 - **AI-Generated (AIGC):** DALL-E Advanced
 - **Constraint:** The held-out benchmark must **never** be used for model training, validation tuning, threshold calibration, or model selection during development. It is reserved exclusively for the final evaluation phase.
 
-### 4.3 Ingestion & Pilot Volume
-- **Pilot Target:** ~8,100 standardized images:
-  - CIFAKE: 1,500 Real + 1,500 Fake = 3,000 images
-  - SID_Set: 1,500 Real + 1,500 Full Synthetic = 3,000 images
-  - WildFake: 1,000 Real + 1,100 AI (stratified across architectures: DDPM, BigGAN, LDM, DALL-E, GLIDE) = 2,100 images
-- **Standardization:** All retained images are converted to RGB, bicubic resized to $224 \times 224$, and stored as JPEG ($Q=90$).
-- **Long-term Scaling Target:** ~30,000–50,000 images, pursued only if pilot validation demonstrates measurable benefit and compute/storage headroom permits.
+### 4.3 Ingestion & Dataset Sizing Strategy
+- **Pilot Dataset (Completed):** 8,000 standardized images (4,000 CIFAKE + 4,000 SID_Set; 6,401 train / 1,599 val) taking 91.3 MB on disk. Used strictly in Phases 1 & 2 to validate pipeline, AMP, VRAM stability, and metrics. Historical results permanently preserved.
+- **Final Frozen Training Dataset:** Exactly **30,000 standardized images** (15,000 CIFAKE + 15,000 SID_Set; 24,000 train / 6,000 val) taking $\approx 345\text{ MB}$ on disk. Once generated, this split is frozen and used identically for both the official Phase 2 clean baseline and the Phase 3 robust model.
+- **Standardization:** All retained images are converted to 3-channel RGB, bicubic resized to $224 \times 224$, and stored as JPEG ($Q=90$). Full-resolution raw images are never retained locally.
 
 ---
 

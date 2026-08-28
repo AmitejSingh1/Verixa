@@ -46,7 +46,11 @@ feat(data): complete Phase 1 dataset ingestion, manifests, and deterministic spl
 ## Phase 2: RGB ConvNeXt-Tiny Baseline
 
 ### 2.1 Objective
-Train and evaluate a standard pretrained ConvNeXt-Tiny classifier on clean RGB images without transformation-aware augmentations or frequency features, establishing the unaugmented performance baseline. Training uses the existing 8K CIFAKE + SID_Set pilot dataset (`data/manifests/merged_manifest.csv`: 6,401 train / 1,599 val) with the fixed seed `1337`. Phase 3 will reuse this exact fixed split to isolate the causal effect of transformation-aware training.
+Train and evaluate a standard pretrained ConvNeXt-Tiny classifier on clean RGB images without transformation-aware augmentations or frequency features, establishing the unaugmented performance baseline.
+
+The Phase 2 workflow consists of two structured steps:
+1. **8K Pilot Experiment (Completed & Preserved):** Validated pipeline, AMP stability, peak VRAM (< 550 MB), and metrics. Checkpoint permanently preserved as `models/convnext_tiny_baseline_8k_pilot.pt` and report preserved as `reports/baseline_clean_eval_8k_pilot.json`.
+2. **Final Frozen 30K Dataset & Official Baseline:** The dataset is scaled to 30,000 images (15,000 CIFAKE + 15,000 SID_Set; 24,000 train / 6,000 val, seed `1337`) and frozen. The clean ConvNeXt-Tiny baseline is trained on this exact final dataset to establish the official unaugmented baseline (`models/convnext_tiny_baseline.pt`, `reports/baseline_clean_eval.json`) for direct comparison with Phase 3.
 
 ### 2.2 Tasks
 - [x] Implement `src/verixa/models/convnext.py` wrapping torchvision's `convnext_tiny(weights=IMAGENET1K_V1)` with custom binary classification head.
@@ -54,15 +58,16 @@ Train and evaluate a standard pretrained ConvNeXt-Tiny classifier on clean RGB i
 - [x] Implement training engine in `src/verixa/training/trainer.py` supporting mixed precision (`torch.amp`), peak VRAM monitoring, cosine annealing scheduler, best-model selection, and early stopping.
 - [x] Implement clean baseline evaluation module in `src/verixa/evaluation/metrics.py` (Accuracy, AUROC, FPR at threshold and 95% TPR).
 - [x] Create CLI training script `scripts/train_rgb.py` supporting configurable epochs, batch size, learning rate, freeze levels, and early stopping patience.
-- [x] **Step 1 — Engineering Smoke Test:** Run a 1-epoch smoke test on the training pipeline using separate output paths (`models/smoke_test.pt`, `reports/smoke_test_eval.json`) to verify CUDA execution, peak VRAM limits, and error-free gradient flow. Smoke test metrics are strictly temporary diagnostic checks and are NOT the official baseline metrics.
-- [x] **Step 2 — Official Baseline Training:** Train clean ConvNeXt-Tiny on the 8K training split for a maximum of 20 epochs with early stopping (patience = 4 epochs without validation AUROC improvement).
-- [x] Model selection based strictly on highest validation AUROC on the 1,599 validation split. The held-out COCO/DALL-E benchmark must NEVER be used for early stopping, tuning, or model selection.
-- [x] Save the best validation-AUROC checkpoint to `models/convnext_tiny_baseline.pt`.
-- [x] Evaluate the best checkpoint on the clean validation set and record the best epoch and corresponding metrics in `reports/baseline_clean_eval.json`.
+- [x] **8K Pilot Validation:** Ran smoke test and pilot baseline training; verified VRAM (< 550 MB) and metrics; preserved outputs to `models/convnext_tiny_baseline_8k_pilot.pt` and `reports/baseline_clean_eval_8k_pilot.json`.
+- [x] **Final 30K Dataset Ingestion & Freeze:** Ingest 15,000 CIFAKE + 15,000 SID_Set (50/50 balance); run deduplication and zero-leakage check; assign deterministic 80/20 split (24,000 train / 6,000 val, seed `1337`); freeze `data/manifests/merged_manifest.csv`.
+- [x] **Official 30K Baseline Training:** Train clean ConvNeXt-Tiny on the final 30K training split for a maximum of 20 epochs with early stopping (patience = 4 epochs without validation AUROC improvement).
+- [x] Model selection based strictly on highest validation AUROC on the 6,000 validation split. The held-out COCO/DALL-E benchmark must NEVER be used for early stopping, tuning, or model selection.
+- [x] Save the official best validation-AUROC checkpoint to `models/convnext_tiny_baseline.pt`.
+- [x] Evaluate the best checkpoint on the clean 6,000 validation set and record the best epoch and corresponding metrics in `reports/baseline_clean_eval.json`.
 
-### 2.3 Training Configuration
-- **Dataset:** 8K CIFAKE + SID_Set (`data/manifests/merged_manifest.csv`)
-- **Split:** Fixed deterministic split (6,401 train / 1,599 val, seed `1337`)
+### 2.3 Official Training Configuration
+- **Dataset:** 30K CIFAKE + SID_Set (`data/manifests/merged_manifest.csv`)
+- **Split:** Fixed deterministic split (24,000 train / 6,000 val, seed `1337`)
 - **Backbone:** ConvNeXt-Tiny (`IMAGENET1K_V1`), Stages 0–2 frozen initially, Stage 3 + binary head trained
 - **Max Epochs:** 20
 - **Early Stopping:** Patience = 4 epochs without validation AUROC improvement
@@ -74,10 +79,10 @@ Train and evaluate a standard pretrained ConvNeXt-Tiny classifier on clean RGB i
 - **Augmentations:** None (clean ImageNet normalization only, no distortion transforms, no FFT)
 
 ### 2.4 Expected Outputs
-- **Temporary Diagnostic Artifacts (Smoke Test):**
-  - Checkpoint: `models/smoke_test.pt`
-  - Diagnostic report: `reports/smoke_test_eval.json`
-- **Official Phase 2 Deliverables (Baseline):**
+- **Historical Pilot Deliverables (Preserved):**
+  - Checkpoint: `models/convnext_tiny_baseline_8k_pilot.pt`
+  - Diagnostic report: `reports/baseline_clean_eval_8k_pilot.json`
+- **Official Phase 2 Deliverables (Final Baseline):**
   - Best model checkpoint: `models/convnext_tiny_baseline.pt`
   - Official evaluation report: `reports/baseline_clean_eval.json` (recording best epoch, Accuracy, AUROC, FPR, and peak VRAM)
 
@@ -87,8 +92,8 @@ Train and evaluate a standard pretrained ConvNeXt-Tiny classifier on clean RGB i
 - Verify zero use of held-out COCO/DALL-E benchmark during Phase 2.
 
 ### 2.6 Completion Criteria
-1. 1-epoch engineering smoke test passes cleanly and verifies VRAM $< 6.0\text{ GB}$.
-2. Official baseline training completes (either reaching 20 epochs or early-stopping after 4 epochs of non-improving validation AUROC).
+1. 30K dataset ingested, deduplicated, split deterministically (24K train / 6K val, seed `1337`), and verified leak-free.
+2. Official baseline training on 30K dataset completes (either reaching 20 epochs or early-stopping after 4 epochs of non-improving validation AUROC).
 3. Best-epoch checkpoint is saved to `models/convnext_tiny_baseline.pt` embedding complete reproducibility configuration.
 4. Official baseline report `reports/baseline_clean_eval.json` is generated documenting the best epoch's clean metrics.
 5. All automated unit tests (`pytest -v`) and linter (`ruff check .`) pass cleanly.
@@ -103,12 +108,12 @@ feat(model): complete Phase 2 RGB ConvNeXt-Tiny baseline training and evaluation
 ## Phase 3: Transformation-Aware Training + Decision Checkpoint #1
 
 ### 3.1 Objective
-Implement dynamic, on-the-fly CPU-side data augmentation in the training pipeline to train a robust RGB ConvNeXt-Tiny model capable of maintaining high classification accuracy under severe distortions.
+Implement dynamic, on-the-fly CPU-side data augmentation in the training pipeline to train a robust RGB ConvNeXt-Tiny model capable of maintaining high classification accuracy under severe distortions. Training uses the exact same frozen 30K dataset and split (`data/manifests/merged_manifest.csv`: 24,000 train / 6,000 val, seed `1337`) to ensure strict head-to-head experimental validity against the Phase 2 baseline.
 
 ### 3.2 Tasks
 - [ ] Implement `src/verixa/training/augmentations.py` with randomized transformations (JPEG $Q \in [30, 90]$, Gaussian blur $\sigma \in [0.5, 2.0]$, bilinear resize $0.25\times\text{--}0.5\times$, Gaussian noise $\sigma \in [0.02, 0.10]$, color jitter $\pm 20\%$, center crop $80\%$).
 - [ ] Integrate transformation-aware pipeline into training DataLoader with configurable probability ($p=0.8$).
-- [ ] Train robust ConvNeXt-Tiny model on augmented data using identical seed `1337` and hyperparameters.
+- [ ] Train robust ConvNeXt-Tiny model on augmented data using the exact same 30K split, seed `1337`, and hyperparameters.
 - [ ] Save checkpoint to `models/convnext_tiny_robust_rgb.pt`.
 - [ ] Evaluate robust model across clean validation data and all 6 required distortion suites at all severities.
 - [ ] Compare robust RGB model against Phase 2 baseline; quantify degradation reduction ($\Delta_{\text{degradation}}$).
