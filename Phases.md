@@ -46,30 +46,54 @@ feat(data): complete Phase 1 dataset ingestion, manifests, and deterministic spl
 ## Phase 2: RGB ConvNeXt-Tiny Baseline
 
 ### 2.1 Objective
-Train and evaluate a standard pretrained ConvNeXt-Tiny classifier on clean RGB images without transformation-aware augmentations to establish the unaugmented performance and vulnerability baseline.
+Train and evaluate a standard pretrained ConvNeXt-Tiny classifier on clean RGB images without transformation-aware augmentations or frequency features, establishing the unaugmented performance baseline. Training uses the existing 8K CIFAKE + SID_Set pilot dataset (`data/manifests/merged_manifest.csv`: 6,401 train / 1,599 val) with the fixed seed `1337`. Phase 3 will reuse this exact fixed split to isolate the causal effect of transformation-aware training.
 
 ### 2.2 Tasks
-- [ ] Implement `src/verixa/models/convnext.py` wrapping torchvision's `convnext_tiny` with custom binary head.
-- [ ] Implement PyTorch `Dataset` and `DataLoader` in `src/verixa/training/dataset.py` reading from `merged_manifest.csv`.
-- [ ] Implement training loop in `src/verixa/training/trainer.py` supporting mixed precision (`torch.amp`), gradient accumulation, VRAM monitoring, and cosine learning rate scheduling.
-- [ ] Implement clean baseline evaluation module in `src/verixa/evaluation/metrics.py` (Accuracy, AUROC, FPR).
-- [ ] Create CLI training script `scripts/train_rgb.py` with configurable epochs, batch size, learning rate, and freeze levels.
-- [ ] Train baseline ConvNeXt-Tiny for 5–10 epochs (clean data only, standard ImageNet normalization).
-- [ ] Evaluate baseline on clean validation set and generate `reports/baseline_clean_eval.json`.
-- [ ] Save checkpoint to `models/convnext_tiny_baseline.pt`.
+- [x] Implement `src/verixa/models/convnext.py` wrapping torchvision's `convnext_tiny(weights=IMAGENET1K_V1)` with custom binary classification head.
+- [x] Implement PyTorch `Dataset` and `DataLoader` in `src/verixa/training/dataset.py` reading from `merged_manifest.csv` with standard ImageNet normalization.
+- [x] Implement training engine in `src/verixa/training/trainer.py` supporting mixed precision (`torch.amp`), peak VRAM monitoring, cosine annealing scheduler, best-model selection, and early stopping.
+- [x] Implement clean baseline evaluation module in `src/verixa/evaluation/metrics.py` (Accuracy, AUROC, FPR at threshold and 95% TPR).
+- [x] Create CLI training script `scripts/train_rgb.py` supporting configurable epochs, batch size, learning rate, freeze levels, and early stopping patience.
+- [x] **Step 1 — Engineering Smoke Test:** Run a 1-epoch smoke test on the training pipeline using separate output paths (`models/smoke_test.pt`, `reports/smoke_test_eval.json`) to verify CUDA execution, peak VRAM limits, and error-free gradient flow. Smoke test metrics are strictly temporary diagnostic checks and are NOT the official baseline metrics.
+- [x] **Step 2 — Official Baseline Training:** Train clean ConvNeXt-Tiny on the 8K training split for a maximum of 20 epochs with early stopping (patience = 4 epochs without validation AUROC improvement).
+- [x] Model selection based strictly on highest validation AUROC on the 1,599 validation split. The held-out COCO/DALL-E benchmark must NEVER be used for early stopping, tuning, or model selection.
+- [x] Save the best validation-AUROC checkpoint to `models/convnext_tiny_baseline.pt`.
+- [x] Evaluate the best checkpoint on the clean validation set and record the best epoch and corresponding metrics in `reports/baseline_clean_eval.json`.
 
-### 2.3 Expected Outputs
-- Trained baseline checkpoint `models/convnext_tiny_baseline.pt`.
-- Baseline report `reports/baseline_clean_eval.json` with clean Accuracy, AUROC, and FPR.
+### 2.3 Training Configuration
+- **Dataset:** 8K CIFAKE + SID_Set (`data/manifests/merged_manifest.csv`)
+- **Split:** Fixed deterministic split (6,401 train / 1,599 val, seed `1337`)
+- **Backbone:** ConvNeXt-Tiny (`IMAGENET1K_V1`), Stages 0–2 frozen initially, Stage 3 + binary head trained
+- **Max Epochs:** 20
+- **Early Stopping:** Patience = 4 epochs without validation AUROC improvement
+- **Model Selection Metric:** Validation AUROC
+- **Batch Size:** 32
+- **Optimizer:** AdamW ($\text{lr}=10^{-4}$, weight decay $10^{-2}$)
+- **Scheduler:** CosineAnnealingLR ($\eta_{\min}=10^{-6}$)
+- **Precision:** Mixed precision (`torch.amp` FP16)
+- **Augmentations:** None (clean ImageNet normalization only, no distortion transforms, no FFT)
 
-### 2.4 Tests & Verification
-- Unit tests for model forward pass, tensor shape verification, and metric calculation functions.
-- Verify peak VRAM during training remains $< 6.0\text{ GB}$.
+### 2.4 Expected Outputs
+- **Temporary Diagnostic Artifacts (Smoke Test):**
+  - Checkpoint: `models/smoke_test.pt`
+  - Diagnostic report: `reports/smoke_test_eval.json`
+- **Official Phase 2 Deliverables (Baseline):**
+  - Best model checkpoint: `models/convnext_tiny_baseline.pt`
+  - Official evaluation report: `reports/baseline_clean_eval.json` (recording best epoch, Accuracy, AUROC, FPR, and peak VRAM)
 
-### 2.5 Completion Criteria
-Baseline training completes cleanly without errors; checkpoint and validation metrics are saved and documented.
+### 2.5 Tests & Verification
+- Unit tests for model forward pass, tensor shapes, stage freezing, and metric functions (`tests/test_convnext.py`).
+- Verify peak VRAM during training remains $< 6.0\text{ GB}$ (budget hard ceiling: 8.0 GB).
+- Verify zero use of held-out COCO/DALL-E benchmark during Phase 2.
 
-### 2.6 Commit Message
+### 2.6 Completion Criteria
+1. 1-epoch engineering smoke test passes cleanly and verifies VRAM $< 6.0\text{ GB}$.
+2. Official baseline training completes (either reaching 20 epochs or early-stopping after 4 epochs of non-improving validation AUROC).
+3. Best-epoch checkpoint is saved to `models/convnext_tiny_baseline.pt` embedding complete reproducibility configuration.
+4. Official baseline report `reports/baseline_clean_eval.json` is generated documenting the best epoch's clean metrics.
+5. All automated unit tests (`pytest -v`) and linter (`ruff check .`) pass cleanly.
+
+### 2.7 Commit Message
 ```text
 feat(model): complete Phase 2 RGB ConvNeXt-Tiny baseline training and evaluation
 ```
