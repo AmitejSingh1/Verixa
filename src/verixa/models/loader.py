@@ -30,3 +30,4 @@ def load_model_from_checkpoint(checkpoint_path: Path, device: torch.device) -> n
     model.to(device)
     model.eval()
     return model
+
