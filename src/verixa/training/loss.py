@@ -20,3 +20,4 @@ class SmoothBCEWithLogitsLoss(nn.Module):
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         smooth_targets = targets * (1.0 - self.alpha) + 0.5 * self.alpha
         return F.binary_cross_entropy_with_logits(logits, smooth_targets)
+
