@@ -189,6 +189,8 @@ def fit_convnext_baseline(
     config: dict[str, Any] | None = None,
     patience: int | None = 4,
     model_name: str = "ConvNeXt-Tiny",
+    optimizer: torch.optim.Optimizer | None = None,
+    criterion: nn.Module | None = None,
 ) -> dict[str, Any]:
     """Execute complete binary classifier training and validation loop.
 
@@ -202,10 +204,15 @@ def fit_convnext_baseline(
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
-    trainable_params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = AdamW(trainable_params, lr=lr, weight_decay=weight_decay)
+    if optimizer is None:
+        trainable_params = [p for p in model.parameters() if p.requires_grad]
+        optimizer = AdamW(trainable_params, lr=lr, weight_decay=weight_decay)
+
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
-    criterion = nn.BCEWithLogitsLoss()
+
+    if criterion is None:
+        criterion = nn.BCEWithLogitsLoss()
+
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
 
     best_val_auroc = 0.0

@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import random
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
@@ -148,15 +149,22 @@ class RobustAugmentation:
         return augmented
 
 
-def get_robust_training_transforms(p: float = 0.8, seed: int | None = 1337) -> transforms.Compose:
+def get_robust_training_transforms(
+    p: float = 0.8,
+    seed: int | None = 1337,
+    horizontal_flip_p: float = 0.0,
+) -> transforms.Compose:
     """Return a torchvision Compose pipeline combining RobustAugmentation with ImageNet norm."""
-    return transforms.Compose(
+    steps: list[Any] = [RobustAugmentation(p=p, seed=seed)]
+    if horizontal_flip_p > 0.0:
+        steps.append(transforms.RandomHorizontalFlip(p=horizontal_flip_p))
+    steps.extend(
         [
-            RobustAugmentation(p=p, seed=seed),
             transforms.ToTensor(),
             transforms.Normalize(mean=DEFAULT_IMAGENET_MEAN, std=DEFAULT_IMAGENET_STD),
         ]
     )
+    return transforms.Compose(steps)
 
 
 # ---------------------------------------------------------------------------
