@@ -204,8 +204,8 @@ def fit_convnext_baseline(
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
+    trainable_params = [p for p in model.parameters() if p.requires_grad]
     if optimizer is None:
-        trainable_params = [p for p in model.parameters() if p.requires_grad]
         optimizer = AdamW(trainable_params, lr=lr, weight_decay=weight_decay)
 
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
