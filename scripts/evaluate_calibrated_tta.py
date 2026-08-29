@@ -80,8 +80,9 @@ def evaluate_split_tta(
     all_probs: list[float] = []
 
     with torch.no_grad():
-        for images, targets in dataloader:
-            images = images.to(device, non_blocking=True)
+        for batch in dataloader:
+            images = batch["image"].to(device, non_blocking=True)
+            targets = batch["label"].long()
             with torch.amp.autocast(device_type=device.type, dtype=torch.float16):
                 logits, probs = predict_with_tta(model, images, use_hflip=use_hflip)
 
