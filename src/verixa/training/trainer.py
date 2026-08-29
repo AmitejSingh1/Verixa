@@ -188,8 +188,9 @@ def fit_convnext_baseline(
     checkpoint_path: Path | None = None,
     config: dict[str, Any] | None = None,
     patience: int | None = 4,
+    model_name: str = "ConvNeXt-Tiny",
 ) -> dict[str, Any]:
-    """Execute complete ConvNeXt-Tiny baseline training and validation loop.
+    """Execute complete binary classifier training and validation loop.
 
     Returns:
         Summary dict of training history, best metrics, and peak VRAM.
@@ -212,7 +213,7 @@ def fit_convnext_baseline(
     best_metrics: dict[str, Any] = {}
     history: list[dict[str, Any]] = []
 
-    print(f"Starting ConvNeXt-Tiny training on device: {device}")
+    print(f"Starting {model_name} training on device: {device}")
     print(f"Trainable parameters: {sum(p.numel() for p in trainable_params):,}\n")
 
     for epoch in range(1, epochs + 1):

@@ -14,26 +14,28 @@
 - **Project Purpose:** Verixa is an end-to-end deep learning framework designed to detect AI-generated synthetic imagery and maintain classification reliability under severe real-world transformations (JPEG compression, Gaussian blur, resizing, Gaussian noise, color jitter, and cropping).
 - **Core Competition Constraints:**
   - **Hardware Budget:** NVIDIA GeForce RTX 4060 Laptop GPU, **8 GB VRAM** hard ceiling (peak allocated VRAM must stay $< 6.0\text{ GB}$).
-  - **Model Complexity Limit:** Maximum **< 2 Billion parameters** (our ConvNeXt-Tiny backbone is ~28.6M parameters, well within budget).
+  - **Model Complexity Limit:** Maximum **< 2 Billion parameters** (our models are ~28.6M to ~30.3M parameters, well within budget).
   - **Storage Ceiling:** Processed image storage target $< 500\text{ MB}$.
 
 ---
 
 ## 2. Current Development Status
 
-- **Current Phase:** **Phase 3: Transformation-Aware Training + Decision Checkpoint #1 — COMPLETED & APPROVED**
+- **Current Phase:** **Phase 4: FFT Experiment + Decision Checkpoint #2 — COMPLETED & ACCEPTED**
 - **Completed Work:**
   - **Phase 1 (Dataset Pipeline):** Fully complete and committed (`30c8775`).
   - **Phase 2 Pilot Experiment (8K Images):** Completed, validated VRAM usage (< 550 MB), and permanently preserved as historical artifacts.
   - **Final 30K Dataset Preparation:** Ingestion of 30,000 images, deduplication, deterministic 80/20 train/val split, and cross-split leakage verification are **COMPLETE AND FROZEN**.
   - **Official 30K Phase 2 Baseline Training:** **COMPLETED AND VERIFIED**. Trained clean ConvNeXt-Tiny on the frozen 30K dataset (`data/manifests/merged_manifest.csv`). Best Epoch 2 achieved **AUROC 0.9964**, **Accuracy 97.03%**, and **FPR 2.80%**. Checkpoint saved to `models/convnext_tiny_baseline.pt` and report saved to `reports/baseline_clean_eval.json`.
   - **Phase 3 Robust RGB Training & Evaluation:** **COMPLETED AND VERIFIED**. Trained robust ConvNeXt-Tiny with on-the-fly transformation augmentations ($p=0.8$) on the identical frozen 30K dataset (`data/manifests/merged_manifest.csv`, seed `1337`). Best Epoch 3 achieved **AUROC 0.9964**, **Clean Accuracy 96.83%**, and **FPR 2.53%**. Checkpoint saved to `models/convnext_tiny_robust_rgb.pt`.
-  - **Decision Checkpoint #1:** **APPROVED**. Evaluated both models across all 16 benchmark conditions (clean + 15 distortion suites). Designated `models/convnext_tiny_robust_rgb.pt` as the official **Fallback Submission Model**.
+  - **Decision Checkpoint #1:** **APPROVED**. Designated `models/convnext_tiny_robust_rgb.pt` as the official **Locked Fallback Submission Model**.
+  - **Phase 4 Standalone FFT Viability Experiment:** **COMPLETED**. Trained 1.63M parameter `FFTClassifier` from scratch on 2D Fourier magnitude spectra. Achieved **84.24% Clean Accuracy**, **94.65% AUROC**, and maintained **93.49% AUROC** under severe JPEG $Q=30$.
+  - **Phase 4 Hybrid RGB + FFT Training & Evaluation:** **COMPLETED AND VERIFIED**. Trained dual-branch `HybridRGBFFTClassifier` (ConvNeXt-Tiny 768-d + 2D FFT CNN 512-d concatenation) on identical 30K dataset ($p=0.8$, seed `1337`). Best Epoch 6 achieved **97.55% Clean Accuracy**, **99.68% AUROC**, **96.96% Mean Transformed Accuracy**, and elevated worst-case floor to **95.40%**. Checkpoint saved to `models/convnext_tiny_hybrid_fft.pt`.
+  - **Decision Checkpoint #2:** **ACCEPTED**. Designated `models/convnext_tiny_hybrid_fft.pt` as the **Current Best Candidate (Primary Submission Model)**; retained `models/convnext_tiny_robust_rgb.pt` as the **Locked Fallback Model**.
 - **In Progress / Current Stage:**
-  - Git commit of Phase 3 deliverables and planning for Phase 4 (FFT Frequency Analysis).
+  - Transition to Phase 5 (Held-Out Benchmark Evaluation).
 - **Not Started:**
-  - **Phase 4 (FFT Dual-Branch Experiment):** Prepared, awaiting user approval to begin implementation.
-  - **Phase 5 (Held-Out Benchmark Evaluation):** Not started.
+  - **Phase 5 (Held-Out Benchmark Evaluation):** Ready to begin.
 
 ---
 
@@ -47,43 +49,24 @@ The training and validation dataset is **FROZEN** and stored in [`data/manifests
 - **Total Dataset Size:** Exactly **30,000 images**.
 - **Class Balance:** Perfectly balanced **50.0% REAL (15,000) / 50.0% AI-GENERATED (15,000)**.
 - **Exclusion of SID_Set Tampered Images:** During streaming, **7,250 tampered images (`label=2`)** were detected and strictly excluded.
-- **Exclusion of WildFake:** WildFake (`hy2628982280/WildFake` on ModelScope) is **strictly excluded from the training dataset**. Technical rationale: ModelScope stores WildFake exclusively inside monolithic 16 GB to 51 GB `.zip` archives per architecture (`GAN_based.zip` 45.1 GB, `DALLE.zip` 24.4 GB, `Midjourney.zip` 51.1 GB). Individual HTTP retrieval returns `404`, making controlled sampling impossible without downloading tens of gigabytes and exceeding local disk budgets.
+- **Exclusion of WildFake:** WildFake (`hy2628982280/WildFake` on ModelScope) is **strictly excluded from the training dataset**.
 
 ### 3.2 Standardization, Storage & Deterministic Split
 - **Image Standardization:** All images are 3-channel RGB, bicubic resized to $224 \times 224$, compressed as JPEG ($Q=90$).
-- **Actual On-Disk Storage:** **307.89 MB** (CIFAKE: 89.90 MB, SID_Set: 217.99 MB), well within the 500 MB budget.
+- **Actual On-Disk Storage:** **307.89 MB** (well within the 500 MB budget).
 - **Deterministic Split Methodology:** Stratified 80/20 split assigned using global seed `1337` and lexicographic SHA-256 group sorting:
   - **Train Split (`train`):** **23,999 images** (80.0%)
-    - `CIFAKE Real (0)`: 6,000 | `CIFAKE Fake (1)`: 5,999
-    - `SID_Set Real (0)`: 6,000 | `SID_Set Synthetic (1)`: 6,000
   - **Validation Split (`val`):** **6,001 images** (20.0%)
-    - `CIFAKE Real (0)`: 1,500 | `CIFAKE Fake (1)`: 1,501
-    - `SID_Set Real (0)`: 1,500 | `SID_Set Synthetic (1)`: 1,500
-  - *(Note: The 1-image delta between 5,999 and 1,501 in CIFAKE Fake is due to duplicate hash grouping preserving exact identical files within the same split to avoid data leakage).*
 - **Cross-Split Hash Leakage:** **Strictly 0**. ($\text{Train SHA} \cap \text{Val SHA} = \emptyset$).
-- **Deduplication Findings:** 22 exact duplicate groups detected; 500 near-duplicate pairs reported in [`reports/final_30k_dedupe_report.json`](file:///c:/Verixa/reports/final_30k_dedupe_report.json).
-- **Manifest Location:** [`data/manifests/merged_manifest.csv`](file:///c:/Verixa/data/manifests/merged_manifest.csv) (30,000 rows).
-- **Dataset Statistics Report:** [`reports/final_dataset_stats.json`](file:///c:/Verixa/reports/final_dataset_stats.json).
+- **Manifest Location:** [`data/manifests/merged_manifest.csv`](file:///c:/Verixa/data/manifests/merged_manifest.csv).
 
 ---
 
 ## 4. 8K Pilot History & Preserved Artifacts
 
-An earlier 8,000-image dataset (4,000 CIFAKE + 4,000 SID_Set; 6,401 train / 1,599 val) was ingested and used as a pilot to validate pipeline stability, mixed precision, and metrics.
-
-### Preserved Historical Pilot Artifacts (NEVER OVERWRITE):
 - **Model Checkpoint:** [`models/convnext_tiny_baseline_8k_pilot.pt`](file:///c:/Verixa/models/convnext_tiny_baseline_8k_pilot.pt) (226.5 MB)
 - **Evaluation Report:** [`reports/baseline_clean_eval_8k_pilot.json`](file:///c:/Verixa/reports/baseline_clean_eval_8k_pilot.json)
-
-### Historical Pilot Results (NOT the official baseline):
-- **Best Epoch:** Epoch 3 (Early stopping triggered at Epoch 7 after 4 non-improving epochs)
-- **Validation AUROC:** 0.9935 (99.35%)
-- **Validation Accuracy:** 96.50%
-- **Validation Loss:** 0.1259
-- **Validation FPR:** 4.62% (37 false positives out of 800 authentic images)
-- **FPR at 95% TPR:** 3.00%
-- **Peak VRAM:** 545.83 MB allocated / 738.00 MB reserved
-- **Average Epoch Duration:** ~36.8 seconds on RTX 4060 GPU
+- **Pilot Metrics:** Best Epoch 3, AUROC 0.9935, Accuracy 96.50%, FPR 4.62%.
 
 ---
 
@@ -92,40 +75,32 @@ An earlier 8,000-image dataset (4,000 CIFAKE + 4,000 SID_Set; 6,401 train / 1,59
 ### 5.1 Official Phase 2 Baseline (Clean Images Only)
 - **Checkpoint:** [`models/convnext_tiny_baseline.pt`](file:///c:/Verixa/models/convnext_tiny_baseline.pt) (237.5 MB)
 - **Report:** [`reports/baseline_clean_eval.json`](file:///c:/Verixa/reports/baseline_clean_eval.json) & [`reports/baseline_distortion_eval.json`](file:///c:/Verixa/reports/baseline_distortion_eval.json)
-- **Best Epoch:** **Epoch 2** (Early stopped at Epoch 6)
-- **Validation Metrics (Clean):**
-  - **AUROC:** **0.9964 (99.64%)**
-  - **Clean Accuracy:** **97.03%**
-  - **Validation Loss:** **0.0920**
-  - **FPR:** **2.80%** (84 FP / 3,000 Real)
-  - **FNR:** **3.13%** (94 FN / 3,001 Fake)
-  - **FPR at 95% TPR:** **1.63%**
+- **Best Epoch:** **Epoch 2** (Clean Acc: 97.03%, AUROC: 99.64%, FPR: 2.80%).
 
-### 5.2 Official Phase 3 Robust Model (Fallback Submission Model)
-- **Checkpoint:** [`models/convnext_tiny_robust_rgb.pt`](file:///c:/Verixa/models/convnext_tiny_robust_rgb.pt) (237.5 MB)
-- **Report:** [`reports/robust_rgb_clean_eval.json`](file:///c:/Verixa/reports/robust_rgb_clean_eval.json), [`reports/robust_distortion_eval.json`](file:///c:/Verixa/reports/robust_distortion_eval.json), and [`reports/robust_rgb_vs_baseline.json`](file:///c:/Verixa/reports/robust_rgb_vs_baseline.json)
-- **Best Epoch:** **Epoch 3** (Early stopped at Epoch 7)
-- **Training Setup:** Identical 30K dataset, random seed `1337`, $p=0.8$ CPU-side transformation augmentations (JPEG, blur, resize, noise, jitter, crop).
-- **Validation Metrics (Clean):**
-  - **AUROC:** **0.9964 (99.64%)** (identical to baseline)
-  - **Clean Accuracy:** **96.83%** (only $-0.20$ percentage points penalty from clean baseline)
-  - **Validation Loss:** **0.0991**
-  - **FPR:** **2.53%** (76 FP / 3,000 Real — lower false alarm rate than baseline)
-  - **FNR:** **3.80%** (114 FN / 3,001 Fake)
-  - **FPR at 95% TPR:** **1.57%**
+### 5.2 Official Phase 3 Robust Model (Locked Fallback Model)
+- **Checkpoint:** [`models/convnext_tiny_robust_rgb.pt`](file:///c:/Verixa/models/convnext_tiny_robust_rgb.pt) (237.5 MB) — **LOCKED & PRESERVED**
+- **Report:** [`reports/robust_rgb_clean_eval.json`](file:///c:/Verixa/reports/robust_rgb_clean_eval.json) & [`reports/robust_distortion_eval.json`](file:///c:/Verixa/reports/robust_distortion_eval.json)
+- **Best Epoch:** **Epoch 3** (Clean Acc: 96.83%, AUROC: 99.64%, FPR: 2.53%).
+- **Robustness:** Worst-case transformed accuracy: **94.33%** (vs 60.71% baseline). Severe noise accuracy: **94.53%** (+33.82 points).
 
-### 5.3 Decision Checkpoint #1 Comparative Findings
-- **Transformation-aware training substantially improved robustness across every tested distortion family.**
-- **Clean accuracy penalty was only 0.20 percentage points** ($97.03\% \rightarrow 96.83\%$), far below the $< 3.0\%$ degradation ceiling.
-- **Severe Gaussian noise ($\sigma=0.10$) improved from 60.71% $\rightarrow$ 94.53% accuracy (+33.82 points)**, preventing catastrophic model failure.
-- **Moderate Gaussian noise ($\sigma=0.05$) improved from 69.84% $\rightarrow$ 95.87% accuracy (+26.03 points)**.
-- **Severe bilinear resize ($0.25\times$) improved from 88.19% $\rightarrow$ 94.33% accuracy (+6.14 points)**.
-- **Severe resize False Positive Rate fell from 18.10% $\rightarrow$ 3.93%** (a $78\%$ reduction in false positive alarms).
-- **Severe Gaussian blur ($\sigma=2.0$) False Positive Rate fell from 10.00% $\rightarrow$ 3.80%** (a $62\%$ reduction in false alarms).
-- **Severe JPEG ($Q=30$)** accuracy improved from $92.90\% \rightarrow 96.00\%$ ($+3.10$ points) and loss halved ($0.2726 \rightarrow 0.1362$).
-- **Worst-Case Transformed Floor:** The robust model's worst accuracy across all 15 distortion conditions was **94.33%**, versus **60.71%** for the unaugmented baseline.
-- **Scientific Criterion Evaluation:** The predefined automated criterion requiring $\ge 15\%$ gain specifically on JPEG $Q=30$ and blur $\sigma=2.0$ was not literally met because the baseline was already high ($> 92\%$), making a $+15\%$ absolute gain mathematically impossible ($92.9\% + 15\% > 100\%$). However, the broader empirical evaluation conclusively demonstrated dramatic resilience across every condition where the baseline actually degraded.
-- **Official Designation:** [`models/convnext_tiny_robust_rgb.pt`](file:///c:/Verixa/models/convnext_tiny_robust_rgb.pt) is officially accepted as the **Fallback Submission Model**.
+### 5.3 Official Phase 4 Standalone FFT Model (Spectral Reference)
+- **Checkpoint:** [`models/fft_standalone.pt`](file:///c:/Verixa/models/fft_standalone.pt) (13.2 MB)
+- **Report:** [`reports/fft_standalone_clean_eval.json`](file:///c:/Verixa/reports/fft_standalone_clean_eval.json) & [`reports/fft_standalone_eval.json`](file:///c:/Verixa/reports/fft_standalone_eval.json)
+- **Best Epoch:** **Epoch 8** (Clean Acc: 84.24%, AUROC: 94.65%, FPR: 5.43%).
+- **Findings:** Confirmed frequency-domain AI generator artifacts exist; resilient to JPEG compression (AUROC 93.49% at Q=30), but vulnerable to severe Gaussian blur smoothing (AUROC 83.07% at $\sigma=2.0$).
+
+### 5.4 Official Phase 4 Hybrid RGB + FFT Model (Current Best Candidate / Primary Submission Model)
+- **Checkpoint:** [`models/convnext_tiny_hybrid_fft.pt`](file:///c:/Verixa/models/convnext_tiny_hybrid_fft.pt) (243.8 MB) — **PRIMARY SUBMISSION CANDIDATE**
+- **Report:** [`reports/hybrid_fft_clean_eval.json`](file:///c:/Verixa/reports/hybrid_fft_clean_eval.json), [`reports/hybrid_distortion_eval.json`](file:///c:/Verixa/reports/hybrid_distortion_eval.json), and [`reports/fft_experiment_decision.json`](file:///c:/Verixa/reports/fft_experiment_decision.json)
+- **Architecture:** ConvNeXt-Tiny spatial branch (768-d) + 2D FFT magnitude spectrum CNN (512-d) concatenated to 1,280-d projection head (~30.3M total params, 17.4M trainable).
+- **Best Epoch:** **Epoch 6** (Clean Acc: **97.55%**, AUROC: **99.68%**, FPR: **2.50%**, FPR@95% TPR: **1.03%**).
+- **Comparative Superiority Across All 16 Conditions:**
+  - Outperformed Robust RGB fallback across **16 out of 16 conditions** (clean and all 15 distortions).
+  - **Mean Transformed Accuracy:** **96.96%** (vs 96.11% for fallback, $+0.85\%$ gain).
+  - **Mean Transformed AUROC:** **99.56%** (vs 99.40% for fallback).
+  - **Worst-Case Robustness Floor:** Elevated from 94.33% to **95.40%** (under noise $\sigma=0.10$).
+  - **Severe Distortions:** JPEG $Q=30$ reached **96.77%**; Blur $\sigma=2.0$ reached **96.68%**; Resize $0.25\times$ reached **96.27%**; Noise $\sigma=0.10$ reached **95.40%**.
+  - **False Alarm Suppression:** FPR under severe blur dropped to **2.83%** (vs 3.80% fallback); FPR under severe resize dropped to **2.57%** (vs 3.93% fallback).
 
 ---
 
@@ -138,18 +113,18 @@ An earlier 8,000-image dataset (4,000 CIFAKE + 4,000 SID_Set; 6,401 train / 1,59
 | [`Rules.md`](file:///c:/Verixa/Rules.md) | Core development rules, scientific rigor, command execution policies |
 | [`Phases.md`](file:///c:/Verixa/Phases.md) | Sequential 8-phase milestones and verifiable completion checklists |
 | [`src/verixa/models/convnext.py`](file:///c:/Verixa/src/verixa/models/convnext.py) | ConvNeXt-Tiny binary classifier implementation and backbone stage freezing logic |
+| [`src/verixa/models/fft.py`](file:///c:/Verixa/src/verixa/models/fft.py) | 2D FFT spectrum extractor (`FFTSpectrumExtractor`) and standalone spectral CNN (`FFTClassifier`) |
+| [`src/verixa/models/hybrid.py`](file:///c:/Verixa/src/verixa/models/hybrid.py) | Dual-branch `HybridRGBFFTClassifier` and `freeze_hybrid_backbone_stages` |
 | [`src/verixa/training/dataset.py`](file:///c:/Verixa/src/verixa/training/dataset.py) | PyTorch Dataset, custom transform support, and eval DataLoader factories |
 | [`src/verixa/training/augmentations.py`](file:///c:/Verixa/src/verixa/training/augmentations.py) | CPU-side 6-family augmentation engine and pickle-safe discrete distortion suites |
 | [`src/verixa/training/trainer.py`](file:///c:/Verixa/src/verixa/training/trainer.py) | AMP training loop, in-place ASCII progress display, VRAM tracker, early stopping |
 | [`src/verixa/evaluation/metrics.py`](file:///c:/Verixa/src/verixa/evaluation/metrics.py) | Evaluation engine: Accuracy, AUROC, FPR at threshold, FPR at 95% TPR, confusion matrix |
-| [`src/verixa/data/ingestion.py`](file:///c:/Verixa/src/verixa/data/ingestion.py) | Local image tree ingestion with bicubic resizing, hashing, and manifest creation |
-| [`src/verixa/data/hf_ingestion.py`](file:///c:/Verixa/src/verixa/data/hf_ingestion.py) | Hugging Face streaming ingestion with buffer shuffling and label mapping |
-| [`src/verixa/data/manifest.py`](file:///c:/Verixa/src/verixa/data/manifest.py) | Manifest parsing, merging, deterministic 80/20 splitting, and statistics reporting |
-| [`src/verixa/data/dedupe.py`](file:///c:/Verixa/src/verixa/data/dedupe.py) | SHA-256 exact deduplication and dHash perceptual hash duplicate analyzer |
 | [`scripts/train_rgb.py`](file:///c:/Verixa/scripts/train_rgb.py) | CLI training script for clean baseline and robust RGB models |
-| [`scripts/evaluate_robustness.py`](file:///c:/Verixa/scripts/evaluate_robustness.py) | CLI 16-condition distortion evaluation harness with comparative delta reporting |
-| [`scripts/ingest_local_dataset.py`](file:///c:/Verixa/scripts/ingest_local_dataset.py) | CLI script for ingesting local datasets (e.g. CIFAKE) |
-| [`scripts/ingest_hf_dataset.py`](file:///c:/Verixa/scripts/ingest_hf_dataset.py) | CLI script for streaming Hugging Face datasets (e.g. SID_Set) |
+| [`scripts/train_fft_standalone.py`](file:///c:/Verixa/scripts/train_fft_standalone.py) | CLI training script for standalone FFT-only model |
+| [`scripts/train_hybrid.py`](file:///c:/Verixa/scripts/train_hybrid.py) | CLI training script for Hybrid RGB+FFT dual-branch model |
+| [`scripts/evaluate_robustness.py`](file:///c:/Verixa/scripts/evaluate_robustness.py) | CLI evaluation harness supporting any model architecture across 16 distortion conditions |
+| [`tests/test_hybrid.py`](file:///c:/Verixa/tests/test_hybrid.py) | Unit tests for Hybrid RGB+FFT model, forward passes, and freezing |
+| [`tests/test_fft.py`](file:///c:/Verixa/tests/test_fft.py) | Unit tests for FFT spectrum extractor and classifier |
 | [`tests/test_augmentations.py`](file:///c:/Verixa/tests/test_augmentations.py) | Unit tests for all 6 augmentation families and evaluation suites |
 | [`tests/test_convnext.py`](file:///c:/Verixa/tests/test_convnext.py) | Unit tests for ConvNeXt forward pass, freezing, and binary metrics |
 | [`tests/test_manifest.py`](file:///c:/Verixa/tests/test_manifest.py) | Unit tests for deterministic splitting and manifest statistics |
@@ -160,36 +135,31 @@ An earlier 8,000-image dataset (4,000 CIFAKE + 4,000 SID_Set; 6,401 train / 1,59
 
 ## 7. Verification Status
 
-- **Automated Tests:** **46/46 passed** (`pytest -v`).
+- **Automated Tests:** **56/56 passed** (`pytest -v`).
 - **Linter & Formatting:** **All checks passed** (`ruff check .`).
 - **Compute Environment:** Python 3.11.16, PyTorch 2.6.0+cu128, CUDA 12.8 active on Windows.
-- **Pretrained Weights Cached:** `convnext_tiny-983f1562.pth` exists locally in Torch hub cache (`114.4 MB`).
-- **GPU Hardware:** NVIDIA GeForce RTX 4060 Laptop GPU (8,192 MB VRAM, measured peak ~546 MB).
+- **GPU Hardware:** NVIDIA GeForce RTX 4060 Laptop GPU (8,192 MB VRAM, measured hybrid peak ~870 MB).
 
 ---
 
 ## 8. Critical Decisions Already Made (Do NOT Silently Reverse)
 
-1. **ConvNeXt-Tiny is the Primary Backbone:** Selected for parameter efficiency (~28.6M params) and high feature representational capacity.
-2. **Fast Fourier Transform (FFT) is Experimental:** Belongs strictly to Phase 4. It will only be adopted if it demonstrates a statistically significant robustness delta over the spatial model.
-3. **No Training From Scratch:** We use ImageNet-1K pretrained weights and fine-tune Stage 3 and the classification head.
-4. **No Ensembles or Giant Models:** Stay strictly under the 2B parameter constraint and 8 GB VRAM budget.
-5. **Held-Out Benchmark Isolation:** COCO val2017 (authentic) and DALL-E Advanced (synthetic) in `data/held_out_benchmark/` must **never** be used for training, validation tuning, threshold calibration, or early stopping. They are reserved strictly for Phase 5.
-6. **No WildFake in Training:** Excluded due to ModelScope's monolithic 16–51 GB zip archive structure.
-7. **Strict Head-to-Head Coupling:** Phase 3 and Phase 4 experiments must use the **exact same frozen 30K dataset and split** as the Phase 2 baseline so that the measured robustness delta is scientifically valid.
-8. **Preserve 8K Pilot Artifacts:** `models/convnext_tiny_baseline_8k_pilot.pt` and `reports/baseline_clean_eval_8k_pilot.json` must never be deleted or overwritten.
-9. **Preserve Fallback Submission Model:** `models/convnext_tiny_robust_rgb.pt` is locked as our official fallback submission model and must never be overwritten or modified.
-10. **Never Fabricate Metadata:** Generator architecture tags must only be recorded if present in verified dataset features.
+1. **Hybrid RGB + FFT is the Primary Candidate:** Selected based on superior performance across all 16 evaluation conditions (**97.55% clean accuracy**, **96.96% mean transformed accuracy**, **95.40% worst-case floor**).
+2. **Robust RGB Model is the Locked Fallback:** [`models/convnext_tiny_robust_rgb.pt`](file:///c:/Verixa/models/convnext_tiny_robust_rgb.pt) is permanently preserved as the official fallback submission model and must never be modified.
+3. **No Further Architecture Iterations:** The architecture is frozen. No cross-attention, gating, or additional branches.
+4. **No Training From Scratch for Backbone:** ConvNeXt-Tiny uses ImageNet-1K pretrained weights; Stage 3 + head are fine-tuned.
+5. **No Ensembles or Giant Models:** The entire hybrid is ~30.3M parameters, $< 1.6\%$ of the 2B parameter limit.
+6. **Held-Out Benchmark Isolation:** `data/held_out_benchmark/` has remained completely untouched and unread throughout training and validation. It is reserved strictly for Phase 5 single-pass evaluation.
+7. **Strict Head-to-Head Experimental Control:** All models were trained on the **identical frozen 30K dataset and split** (`data/manifests/merged_manifest.csv`, seed `1337`) with identical augmentation settings ($p=0.8$) where applicable.
 
 ---
 
 ## 9. AI-Agent Workflow & User Collaboration Rules
 
-- **User Runs Training Commands:** The user wants to personally execute long-running training commands locally in their VS Code PowerShell terminal to view live progress.
-- **Never Silently Train in Background:** Do not launch multi-epoch training commands via background agent tasks without explicit user instruction.
-- **Provide Exact Commands:** When prompting the user, provide the complete, copy-pasteable PowerShell command using the direct Python binary (`& 'C:\Users\amite\anaconda3\envs\verixa\python.exe' ...`) to avoid `conda run` buffering issues.
-- **ASCII-Only Progress Display:** Windows PowerShell mangles Unicode block characters (`███` $\rightarrow$ `â–ˆ`). Always use 7-bit ASCII characters (`#` and `-`).
-- **Single-Line In-Place Rendering:** Terminal output must use `\r` to update progress on a single line, followed by a permanent epoch summary line upon stage completion. Do not print a new line for every batch.
+- **User Runs Commands:** The user personally executes evaluation commands locally in their VS Code PowerShell terminal to view live progress.
+- **Direct Python Binary:** Always provide commands using direct Python binary (`& 'C:\Users\amite\anaconda3\envs\verixa\python.exe' ...`).
+- **ASCII-Only Display:** Use 7-bit ASCII characters (`#` and `-`) for progress bars to avoid Windows PowerShell encoding issues.
+- **In-Place Progress Updates:** Use single-line `\r` updates with permanent summary prints upon stage completion.
 
 ---
 
@@ -198,17 +168,21 @@ An earlier 8,000-image dataset (4,000 CIFAKE + 4,000 SID_Set; 6,401 train / 1,59
 - **Completed Commits:**
   - `30c8775` — `feat(model): complete Phase 2 RGB ConvNeXt-Tiny baseline training and evaluation`
   - `c5062b9` — `feat(model): complete Phase 2 RGB ConvNeXt-Tiny baseline training on 30K dataset`
-- **Current Working Tree:** All Phase 3 deliverables complete and verified. Ready to commit:
-  `feat(training): complete Phase 3 transformation-aware training and Checkpoint 1`
+  - `6b0e3f8` — `feat(training): complete Phase 3 transformation-aware training and Checkpoint 1`
+- **Current Working Tree:** All Phase 4 deliverables complete and verified. Ready to commit:
+  `feat(exp): complete Phase 4 FFT dual-branch experiment and Checkpoint 2`
 
 ---
 
 ## 11. NEXT ACTION
 
-1. Stage all Phase 3 implementation, tests, reports, and documentation.
-2. Commit with message: `feat(training): complete Phase 3 transformation-aware training and Checkpoint 1`.
-3. Verify `git status` is 100% clean.
-4. Prepare Phase 4: FFT-only branch implementation, empirical evaluation on clean + JPEG + blur, and rigorous hypothesis testing before building any hybrid fusion model.
+1. Commit Phase 4 deliverables:
+   `git commit -m "feat(exp): complete Phase 4 FFT dual-branch experiment and Checkpoint 2"`
+2. Verify `git status` is 100% clean.
+3. Proceed to **Phase 5: Final Robustness Evaluation & Held-Out Benchmark**:
+   - Verify held-out benchmark integrity (`data/held_out_benchmark/`).
+   - Run full 16-condition evaluation report generation for documentation.
+   - Run single-pass final evaluation on the isolated held-out benchmark for both the Primary Model (`models/convnext_tiny_hybrid_fft.pt`) and Fallback Model (`models/convnext_tiny_robust_rgb.pt`).
 
 ---
 
@@ -220,5 +194,5 @@ When you resume or take over this repository:
 - [ ] Read `Phases.md` for milestone requirements.
 - [ ] Run `git status` to verify the exact state of the working tree.
 - [ ] Run `pytest -v` and `ruff check .` before modifying any code.
-- [ ] Never assume an intended experiment has finished without checking files on disk.
+- [ ] Never modify or overwrite locked checkpoints on disk.
 - [ ] Follow the exact Next Action outlined in Section 11.

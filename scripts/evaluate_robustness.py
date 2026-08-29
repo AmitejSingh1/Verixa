@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -59,13 +60,33 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional path to baseline distortion eval JSON to compute deltas.",
     )
+    parser.add_argument(
+        "--conditions",
+        type=str,
+        default="all",
+        help="Comma-separated list of conditions to evaluate, or 'all'.",
+    )
     return parser.parse_args()
 
 
 def load_model_from_checkpoint(checkpoint_path: Path, device: torch.device) -> nn.Module:
     """Load model architecture and weights from checkpoint dictionary."""
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    model = ConvNeXtBinaryClassifier(pretrained=False)
+    config = checkpoint.get("config", {})
+    arch = config.get("architecture", "convnext_tiny")
+
+    if arch == "fft_standalone":
+        from verixa.models.fft import FFTClassifier
+
+        use_grayscale = config.get("use_grayscale", True)
+        model: nn.Module = FFTClassifier(use_grayscale=use_grayscale)
+    elif arch == "hybrid_rgb_fft":
+        from verixa.models.hybrid import HybridRGBFFTClassifier
+
+        model = HybridRGBFFTClassifier(pretrained=False, use_grayscale_fft=True)
+    else:
+        model = ConvNeXtBinaryClassifier(pretrained=False)
+
     state_dict = checkpoint.get("model_state_dict", checkpoint)
     model.load_state_dict(state_dict)
     model.to(device)
@@ -89,7 +110,10 @@ def main() -> int:
     model = load_model_from_checkpoint(args.model_path, device=device)
     criterion = nn.BCEWithLogitsLoss()
 
-    suite_keys = ["clean"] + list(EVAL_DISTORTION_SUITES.keys())
+    if args.conditions == "all":
+        suite_keys = ["clean"] + list(EVAL_DISTORTION_SUITES.keys())
+    else:
+        suite_keys = [c.strip() for c in args.conditions.split(",") if c.strip()]
     results: dict[str, Any] = {}
 
     clean_acc = 0.0
@@ -146,53 +170,74 @@ def main() -> int:
 
     print("-" * 75)
 
-    # Comparison and Decision Checkpoint #1 analysis if baseline report is provided
+    # Compute model aggregate statistics across evaluated conditions
+    transformed_keys = [k for k in suite_keys if k != "clean"]
+    mean_trans_acc = (
+        float(np.mean([results[k]["accuracy"] for k in transformed_keys]))
+        if transformed_keys else clean_acc
+    )
+    mean_trans_auroc = (
+        float(np.mean([results[k]["auroc"] for k in transformed_keys]))
+        if transformed_keys else clean_auroc
+    )
+    worst_case_k = min(suite_keys, key=lambda k: results[k]["accuracy"])
+    worst_case_acc = results[worst_case_k]["accuracy"]
+
+    print(f"\nModel Summary Across {len(suite_keys)} Condition(s):")
+    print(f"  Clean Accuracy:          {clean_acc*100:.2f}% | AUROC: {clean_auroc*100:.2f}%")
+    if transformed_keys:
+        print(f"  Mean Transformed Acc:    {mean_trans_acc*100:.2f}%")
+        print(f"  Mean Transformed AUROC:  {mean_trans_auroc*100:.2f}%")
+        print(f"  Worst-Case Condition:    {worst_case_k} ({worst_case_acc*100:.2f}%)")
+
+    # Comparison and Decision Checkpoint analysis if comparison report is provided
     comparison: dict[str, Any] = {}
     if args.compare_to is not None and args.compare_to.exists():
         baseline_report = json.loads(args.compare_to.read_text(encoding="utf-8"))
         base_results = baseline_report.get("results", baseline_report)
 
         print("\n=================================================================")
-        print(" Comparative Analysis vs. Baseline (Decision Checkpoint #1)")
+        print(" Comparative Analysis vs. Reference Model")
         print("=================================================================")
-
-        jpeg30_base_acc = base_results.get("jpeg_q30", {}).get("accuracy", 0.0)
-        jpeg30_rob_acc = results.get("jpeg_q30", {}).get("accuracy", 0.0)
-        jpeg30_delta = jpeg30_rob_acc - jpeg30_base_acc
-
-        blur2_base_acc = base_results.get("blur_sigma2.0", {}).get("accuracy", 0.0)
-        blur2_rob_acc = results.get("blur_sigma2.0", {}).get("accuracy", 0.0)
-        blur2_delta = blur2_rob_acc - blur2_base_acc
 
         clean_base_acc = base_results.get("clean", {}).get("accuracy", 0.0)
         clean_drop = clean_base_acc - clean_acc
 
-        jpeg30_pass = jpeg30_delta >= 0.15
-        blur2_pass = blur2_delta >= 0.15
-        clean_pass = clean_drop < 0.03
+        common_trans = [k for k in transformed_keys if k in base_results]
+        ref_trans_acc = (
+            float(np.mean([base_results[k]["accuracy"] for k in common_trans]))
+            if common_trans else 0.0
+        )
+        cur_trans_acc = (
+            float(np.mean([results[k]["accuracy"] for k in common_trans]))
+            if common_trans else 0.0
+        )
+        trans_acc_gain = cur_trans_acc - ref_trans_acc
 
-        checkpoint_1_pass = (jpeg30_pass or blur2_pass) and clean_pass
+        if common_trans:
+            ref_worst_k = min(common_trans, key=lambda k: base_results[k]["accuracy"])
+            ref_worst_acc = base_results[ref_worst_k]["accuracy"]
+        else:
+            ref_worst_k = "N/A"
+            ref_worst_acc = 0.0
 
         comparison = {
-            "clean_baseline_acc": clean_base_acc,
-            "clean_robust_acc": clean_acc,
+            "clean_reference_acc": clean_base_acc,
+            "clean_current_acc": clean_acc,
             "clean_drop": round(clean_drop, 4),
-            "jpeg_q30_baseline_acc": jpeg30_base_acc,
-            "jpeg_q30_robust_acc": jpeg30_rob_acc,
-            "jpeg_q30_improvement": round(jpeg30_delta, 4),
-            "blur_sigma2_baseline_acc": blur2_base_acc,
-            "blur_sigma2_robust_acc": blur2_rob_acc,
-            "blur_sigma2_improvement": round(blur2_delta, 4),
-            "clean_drop_acceptable (<3%)": clean_pass,
-            "severe_distortion_gain (>=15%)": (jpeg30_pass or blur2_pass),
-            "checkpoint_1_passed": checkpoint_1_pass,
+            "mean_trans_acc_ref": round(ref_trans_acc, 4),
+            "mean_trans_acc_cur": round(cur_trans_acc, 4),
+            "mean_trans_acc_gain": round(trans_acc_gain, 4),
+            "worst_case_cur": {"condition": worst_case_k, "accuracy": worst_case_acc},
+            "worst_case_ref": {"condition": ref_worst_k, "accuracy": ref_worst_acc},
         }
 
-        print(f" Clean Accuracy Drop:     {clean_drop*100:+.2f}%  (Target: < 3.0%)")
-        print(f" JPEG Q=30 Gain:          {jpeg30_delta*100:+.2f}% (Target: >= +15.0%)")
-        print(f" Blur sigma=2.0 Gain:     {blur2_delta*100:+.2f}% (Target: >= +15.0%)")
-        status_str = "PASSED (Fallback Designated)" if checkpoint_1_pass else "REVIEW REQUIRED"
-        print(f" Decision Checkpoint #1:  {status_str}")
+        print(f" Clean Accuracy Delta:    {clean_acc - clean_base_acc:+.2f}%")
+        print(f" Mean Transformed Delta:  {trans_acc_gain:+.2f}%")
+        print(
+            f" Worst-Case Accuracy:     {worst_case_acc*100:.2f}% "
+            f"(Ref: {ref_worst_acc*100:.2f}%)"
+        )
         print("=================================================================")
 
     output_payload = {
