@@ -178,6 +178,7 @@ EVAL_DISTORTION_NAMES: list[str] = [
     "jitter_pm10",
     "jitter_pm20",
     "crop_fraction0.80",
+    "composite_severe",
 ]
 
 
@@ -226,6 +227,10 @@ class DiscreteDistortionTransform:
             return apply_color_jitter(img, brightness=1.2, contrast=0.8, saturation=1.2)
         elif name == "crop_fraction0.80":
             return apply_center_crop(img, crop_fraction=0.80)
+        elif name == "composite_severe":
+            img = apply_jpeg_compression(img, quality=50)
+            img = apply_gaussian_blur(img, sigma=1.0)
+            return apply_resize(img, scale=0.50)
         raise ValueError(f"Unknown distortion: {name}")
 
 
