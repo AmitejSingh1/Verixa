@@ -264,10 +264,10 @@ def main() -> int:
     report_payload = {
         "config": run_config,
         "training_time_seconds": round(t_elapsed, 2),
-        "best_epoch": results["best_epoch"],
-        "best_metrics": results["best_metrics"],
-        "peak_vram_mb": results["peak_vram_mb"],
-        "history": results["history"],
+        "best_epoch": results.get("best_epoch"),
+        "best_metrics": results.get("best_val_metrics", results.get("best_metrics")),
+        "peak_vram_mb": results.get("peak_vram", results.get("peak_vram_mb")),
+        "history": results.get("history"),
     }
     args.report_out.parent.mkdir(parents=True, exist_ok=True)
     args.report_out.write_text(
