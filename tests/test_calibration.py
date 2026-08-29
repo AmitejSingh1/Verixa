@@ -61,3 +61,4 @@ def test_fit_temperature_scaling() -> None:
     T = fit_temperature_scaling(logits, y_true)
     assert isinstance(T, float)
     assert 0.1 < T < 10.0
+

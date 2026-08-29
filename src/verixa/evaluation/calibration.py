@@ -118,7 +118,7 @@ def fit_temperature_scaling(
 
     def nll_objective(T_arr: np.ndarray) -> float:
         T = float(T_arr[0])
-        scaled_z = z / max(T, 1e-4)
+        scaled_z = np.clip(z / max(T, 1e-4), -50.0, 50.0)
         # Numerically stable binary cross entropy
         loss = np.maximum(scaled_z, 0) - scaled_z * y + np.log(1.0 + np.exp(-np.abs(scaled_z)))
         return float(np.mean(loss))
