@@ -68,6 +68,8 @@ def create_dataloaders(
     batch_size: int = 32,
     num_workers: int = 2,
     seed: int = 1337,
+    train_transform: Callable[[Image.Image], torch.Tensor] | None = None,
+    val_transform: Callable[[Image.Image], torch.Tensor] | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     """Create train and validation DataLoaders from a merged manifest with assigned splits."""
     all_rows = read_manifest(manifest_path)
@@ -79,8 +81,11 @@ def create_dataloaders(
             f"Manifest {manifest_path} must have 'train' and 'val' splits assigned before training."
         )
 
-    train_dataset = VerixaDataset(train_rows, transform=get_clean_transforms())
-    val_dataset = VerixaDataset(val_rows, transform=get_clean_transforms())
+    t_train = train_transform if train_transform is not None else get_clean_transforms()
+    t_val = val_transform if val_transform is not None else get_clean_transforms()
+
+    train_dataset = VerixaDataset(train_rows, transform=t_train)
+    val_dataset = VerixaDataset(val_rows, transform=t_val)
 
     generator = torch.Generator()
     generator.manual_seed(seed)
@@ -103,3 +108,28 @@ def create_dataloaders(
     )
 
     return train_loader, val_loader
+
+
+def create_eval_dataloader(
+    manifest_path: Path,
+    split: str = "val",
+    transform: Callable[[Image.Image], torch.Tensor] | None = None,
+    batch_size: int = 32,
+    num_workers: int = 2,
+) -> DataLoader:
+    """Create an evaluation DataLoader for a specific split with an arbitrary transform."""
+    all_rows = read_manifest(manifest_path)
+    eval_rows = [r for r in all_rows if r["split"] == split]
+
+    if not eval_rows:
+        raise ValueError(f"No samples found with split='{split}' in {manifest_path}")
+
+    dataset = VerixaDataset(eval_rows, transform=transform or get_clean_transforms())
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+    )
+

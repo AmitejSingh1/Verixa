@@ -73,16 +73,27 @@ def parse_args() -> argparse.Namespace:
         help="DataLoader worker subprocesses.",
     )
     parser.add_argument(
+        "--robust-augment",
+        action="store_true",
+        help="Enable transformation-aware on-the-fly data augmentations for Phase 3.",
+    )
+    parser.add_argument(
+        "--aug-prob",
+        type=float,
+        default=0.8,
+        help="Probability of applying transformation-aware augmentation per training sample.",
+    )
+    parser.add_argument(
         "--checkpoint-out",
         type=Path,
-        default=Path("models/convnext_tiny_baseline.pt"),
-        help="Output path for best checkpoint.",
+        default=None,
+        help="Output path for best checkpoint. Defaults to baseline or robust based on mode.",
     )
     parser.add_argument(
         "--report-out",
         type=Path,
-        default=Path("reports/baseline_clean_eval.json"),
-        help="Output path for evaluation report JSON.",
+        default=None,
+        help="Output path for evaluation report JSON. Defaults based on mode.",
     )
     return parser.parse_args()
 
@@ -101,18 +112,33 @@ def main() -> int:
     args = parse_args()
     set_seed(args.seed)
 
+    if args.robust_augment:
+        checkpoint_out = args.checkpoint_out or Path("models/convnext_tiny_robust_rgb.pt")
+        report_out = args.report_out or Path("reports/robust_rgb_clean_eval.json")
+        mode_str = f"Phase 3: Robust RGB Training (p={args.aug_prob})"
+        from verixa.training.augmentations import get_robust_training_transforms
+
+        train_transform = get_robust_training_transforms(p=args.aug_prob, seed=args.seed)
+    else:
+        checkpoint_out = args.checkpoint_out or Path("models/convnext_tiny_baseline.pt")
+        report_out = args.report_out or Path("reports/baseline_clean_eval.json")
+        mode_str = "Phase 2: RGB Baseline Training (Clean Images)"
+        train_transform = None
+
     print("=================================================================")
-    print(" Verixa — Phase 2: RGB ConvNeXt-Tiny Baseline Model Training")
+    print(f" Verixa — {mode_str}")
     print("=================================================================")
     print(f" Manifest:       {args.manifest}")
+    aug_info = f"p={args.aug_prob}" if args.robust_augment else "N/A"
+    print(f" Robust Augment: {args.robust_augment} ({aug_info})")
     print(f" Max Epochs:     {args.epochs}")
     print(f" Patience:       {args.patience} epochs")
     print(f" Batch size:     {args.batch_size}")
     print(f" Learning rate:  {args.lr}")
     print(f" Frozen stages:  features[0..{args.freeze_stages}]")
     print(f" Random seed:    {args.seed}")
-    print(f" Checkpoint out: {args.checkpoint_out}")
-    print(f" Report out:     {args.report_out}")
+    print(f" Checkpoint out: {checkpoint_out}")
+    print(f" Report out:     {report_out}")
     print("=================================================================")
 
     # 1. Dataloaders
@@ -121,6 +147,7 @@ def main() -> int:
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         seed=args.seed,
+        train_transform=train_transform,
     )
     print(
         f"Loaded {len(train_loader.dataset):,} train samples, "
@@ -137,6 +164,8 @@ def main() -> int:
         "pretrained": True,
         "dropout": 0.3,
         "freeze_stages": args.freeze_stages,
+        "robust_augment": args.robust_augment,
+        "aug_prob": args.aug_prob if args.robust_augment else 0.0,
         "max_epochs": args.epochs,
         "patience": args.patience,
         "batch_size": args.batch_size,
@@ -159,19 +188,20 @@ def main() -> int:
         lr=args.lr,
         weight_decay=args.weight_decay,
         device=device,
-        checkpoint_path=args.checkpoint_out,
+        checkpoint_path=checkpoint_out,
         config=run_config,
         patience=args.patience,
     )
 
     # 5. Save report
-    args.report_out.parent.mkdir(parents=True, exist_ok=True)
-    args.report_out.write_text(json.dumps(results, indent=2, sort_keys=True), encoding="utf-8")
-    print(f"\nTraining complete. Saved clean evaluation report to: {args.report_out}")
-    print(f"Saved best model checkpoint to: {args.checkpoint_out}")
+    report_out.parent.mkdir(parents=True, exist_ok=True)
+    report_out.write_text(json.dumps(results, indent=2, sort_keys=True), encoding="utf-8")
+    print(f"\nTraining complete. Saved clean evaluation report to: {report_out}")
+    print(f"Saved best model checkpoint to: {checkpoint_out}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
 
