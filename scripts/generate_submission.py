@@ -13,7 +13,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-from scripts.evaluate_robustness import load_model_from_checkpoint
+from verixa.models.loader import load_model_from_checkpoint
 from verixa.training.dataset import DEFAULT_IMAGENET_MEAN, DEFAULT_IMAGENET_STD
 
 
@@ -57,18 +57,32 @@ def parse_args() -> argparse.Namespace:
         default=Path("predictions.csv"),
         help="Output CSV path.",
     )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default=None,
+        help="Optional split filter (e.g. 'val', 'test', 'train').",
+    )
     return parser.parse_args()
 
 
-def get_image_paths(manifest_path: Path | None, image_dir: Path | None) -> list[Path]:
+def get_image_paths(
+    manifest_path: Path | None,
+    image_dir: Path | None,
+    split: str | None = None,
+) -> list[Path]:
     """Retrieve list of image paths from either a manifest CSV or image directory."""
     if manifest_path is not None and manifest_path.exists():
         paths: list[Path] = []
         with open(manifest_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                p = Path(row["filepath"])
-                paths.append(p)
+                if split is not None and "split" in row and row["split"] != split:
+                    continue
+                raw_path = row.get("image_path") or row.get("filepath")
+                if raw_path is None:
+                    raise KeyError("Manifest must contain 'image_path' or 'filepath' column.")
+                paths.append(Path(raw_path))
         return paths
 
     if image_dir is not None and image_dir.exists():
@@ -90,7 +104,7 @@ def main() -> int:
     print(f" Device:           {device}")
     print("=================================================================")
 
-    image_paths = get_image_paths(args.manifest, args.image_dir)
+    image_paths = get_image_paths(args.manifest, args.image_dir, split=args.split)
     print(f"Discovered {len(image_paths):,} images for inference.")
 
     model = load_model_from_checkpoint(args.model_path, device=device)

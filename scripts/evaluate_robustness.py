@@ -14,7 +14,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from verixa.models.convnext import ConvNeXtBinaryClassifier
+from verixa.models.loader import load_model_from_checkpoint
 from verixa.training.augmentations import EVAL_DISTORTION_SUITES, get_distortion_eval_transform
 from verixa.training.dataset import create_eval_dataloader
 from verixa.training.trainer import evaluate_model
@@ -67,31 +67,6 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated list of conditions to evaluate, or 'all'.",
     )
     return parser.parse_args()
-
-
-def load_model_from_checkpoint(checkpoint_path: Path, device: torch.device) -> nn.Module:
-    """Load model architecture and weights from checkpoint dictionary."""
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    config = checkpoint.get("config", {})
-    arch = config.get("architecture", "convnext_tiny")
-
-    if arch == "fft_standalone":
-        from verixa.models.fft import FFTClassifier
-
-        use_grayscale = config.get("use_grayscale", True)
-        model: nn.Module = FFTClassifier(use_grayscale=use_grayscale)
-    elif arch == "hybrid_rgb_fft":
-        from verixa.models.hybrid import HybridRGBFFTClassifier
-
-        model = HybridRGBFFTClassifier(pretrained=False, use_grayscale_fft=True)
-    else:
-        model = ConvNeXtBinaryClassifier(pretrained=False)
-
-    state_dict = checkpoint.get("model_state_dict", checkpoint)
-    model.load_state_dict(state_dict)
-    model.to(device)
-    model.eval()
-    return model
 
 
 def main() -> int:

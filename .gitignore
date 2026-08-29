@@ -28,3 +28,4 @@ reports/*
 *.ckpt
 *.onnx
 *.log
+predictions*.csv
