@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from typing import Any
 
@@ -82,12 +83,16 @@ class VerixaPredictor:
         conf = prob if pred_label == 1 else (1.0 - prob)
 
         return {
+            "image_path": source_desc,
+            "pred": pred_label,
+            "probability": round(prob, 6),
+            "confidence": round(conf * 100.0, 2),
+            "class_name": class_name,
+            "threshold": self.threshold,
             "filepath": source_desc,
             "prediction": pred_label,
-            "class_name": class_name,
             "probability_synthetic": round(prob, 6),
             "confidence_pct": round(conf * 100.0, 2),
-            "threshold": self.threshold,
         }
 
     def predict_batch(
@@ -133,16 +138,42 @@ class VerixaPredictor:
                     conf = prob if pred_label == 1 else (1.0 - prob)
                     results.append(
                         {
+                            "image_path": str(p),
+                            "pred": pred_label,
+                            "probability": round(prob, 6),
+                            "confidence": round(conf * 100.0, 2),
+                            "class_name": class_name,
+                            "threshold": self.threshold,
                             "filepath": str(p),
                             "prediction": pred_label,
-                            "class_name": class_name,
                             "probability_synthetic": round(prob, 6),
                             "confidence_pct": round(conf * 100.0, 2),
-                            "threshold": self.threshold,
                         }
                     )
 
         return results
+
+    def save_predictions_to_json(
+        self,
+        results: list[dict[str, Any]],
+        output_json: Path | str,
+    ) -> None:
+        """Write prediction records to a standard JSON file formatted for submission."""
+        out_path = Path(output_json)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        json_records = [
+            {
+                "image_path": r.get("image_path", r.get("filepath", "")),
+                "pred": int(r.get("pred", r.get("prediction", 0))),
+                "probability": float(r.get("probability", r.get("probability_synthetic", 0.0))),
+                "confidence": float(r.get("confidence", r.get("confidence_pct", 0.0))),
+                "class_name": str(
+                    r.get("class_name", "AI-Generated" if r.get("pred", 0) == 1 else "Authentic")
+                ),
+            }
+            for r in results
+        ]
+        out_path.write_text(json.dumps(json_records, indent=2), encoding="utf-8")
 
     def save_predictions_to_csv(
         self,
@@ -153,14 +184,16 @@ class VerixaPredictor:
         out_path = Path(output_csv)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fieldnames = [
+            "image_path",
+            "pred",
+            "probability",
+            "confidence",
+            "class_name",
             "filepath",
             "prediction",
-            "class_name",
-            "probability_synthetic",
-            "confidence_pct",
             "threshold",
         ]
         with open(out_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(results)

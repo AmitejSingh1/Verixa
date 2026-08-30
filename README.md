@@ -141,16 +141,41 @@ Analysis Result:
   Inference Time: 18.4 ms
 ```
 
-### 2. Batch Directory Inference
+### 2. Batch Directory Inference (Image Directory → `predictions.json`)
 
-Process an entire folder of mixed images with GPU batch acceleration:
+Process an entire folder of evaluation images with GPU batch acceleration. By default, this generates a competition-compliant JSON file containing `image_path` and `pred` for every image:
 
 ```powershell
 python scripts/predict.py `
   --image-dir path/to/images/ `
   --batch-size 32 `
-  --output predictions.csv
+  --output predictions.json
 ```
+
+**JSON Output Format (`predictions.json`):**
+```json
+[
+  {
+    "image_path": "path/to/images/sample1.jpg",
+    "pred": 0,
+    "probability": 0.000123,
+    "confidence": 99.99,
+    "class_name": "Authentic"
+  },
+  {
+    "image_path": "path/to/images/sample2.png",
+    "pred": 1,
+    "probability": 0.998741,
+    "confidence": 99.87,
+    "class_name": "AI-Generated"
+  }
+]
+```
+
+- **`image_path` (string):** Path to the evaluated image file.
+- **`pred` (integer):** Binary classification decision where `0` denotes **Authentic** and `1` denotes **AI-Generated / Synthetic** (evaluated at locked threshold $\theta = 0.50$).
+- **`probability` (float):** Continuous synthetic probability in $[0.0, 1.0]$.
+- **`confidence` (float):** Decision confidence percentage in $[50.0\%, 100.0\%]$.
 
 ### 3. Python API Integration
 
@@ -264,3 +289,18 @@ C:\Verixa\
 1. **Unseen Modern Generator Shift:** While Verixa achieves a strong $92.13\%$ AUROC on unseen DALL·E 3 images, modern consistency decoders with high perceptual loss fine-tuning eliminate many traditional high-frequency artifacts. For investigative auditing prioritizing high synthetic recall, practitioners can inspect continuous probability outputs.
 2. **Extreme Image Degradation:** Heavy additive Gaussian noise ($\sigma = 0.10$) reduces accuracy to $95.37\%$, and extreme downsampling ($0.25\times$) reduces accuracy to $96.27\%$ by obscuring fine spatial textures and frequency components.
 3. **Hardware Efficiency:** Peak VRAM is capped at $\le 1.3\text{ GB}$ during training and $< 400\text{ MB}$ during inference, enabling rapid deployment on standard consumer GPUs and edge workstations ($< 20\text{ ms}$ per image on RTX 4060).
+
+---
+
+## What We Would Improve With More Time
+
+1. **Latent Space Pretraining on Modern Consistency Models:** Integrate self-supervised pretraining directly on latent decoders of modern Diffusion Transformers (e.g., SDXL, Flux, Midjourney v6) to learn decoder residuals invariant to content.
+2. **Steerable Wavelet & Multi-Scale Frequency Analysis:** Replace global 2D FFT with steerable pyramids or 2D discrete wavelet transforms (DWT) to capture multi-scale, directional frequency anomalies without vulnerability to spatial orientation.
+3. **Blind Distortion-Adaptive Calibration:** Incorporate a lightweight quality estimator (estimating JPEG quality factor and noise variance) to dynamically calibrate decision boundaries per image at inference time.
+4. **Ensemble Knowledge Distillation:** Distill complementary backbones (e.g., Swin Transformer + ConvNeXt + EfficientNet) into an ultra-low-latency single-pass student network.
+
+---
+
+## Team Member Contributions
+
+- **Amitej Singh:** End-to-end architecture design, data engineering & deduplication pipeline, ConvNeXt spatial backbone integration, 2D FFT spectral branch design and hybrid concatenation fusion, transformation-aware augmentation engine, canonical threshold calibration, production inference CLI, and documentation.

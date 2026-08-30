@@ -110,16 +110,91 @@ def test_verixa_predictor_batch_and_csv(tmp_path: Path, monkeypatch: pytest.Monk
     Image.new("RGB", (50, 50), color="blue").save(img2)
 
     res_single = predictor.predict_image(img1)
-    assert res_single["prediction"] == 1
+    assert res_single["pred"] == 1
+    assert res_single["image_path"] == str(img1)
     assert res_single["class_name"] == "AI-Generated"
 
     res_batch = predictor.predict_batch([img1, img2], batch_size=2)
     assert len(res_batch) == 2
+    for r in res_batch:
+        assert "image_path" in r
+        assert "pred" in r
+        assert r["pred"] in (0, 1)
 
     out_csv = tmp_path / "preds.csv"
     predictor.save_predictions_to_csv(res_batch, out_csv)
     assert out_csv.exists()
     content = out_csv.read_text(encoding="utf-8")
-    assert "filepath,prediction,class_name" in content
-    assert "AI-Generated" in content
+    assert "image_path,pred,probability" in content
+
+    out_json = tmp_path / "predictions.json"
+    predictor.save_predictions_to_json(res_batch, out_json)
+    assert out_json.exists()
+    import json
+    data = json.loads(out_json.read_text(encoding="utf-8"))
+    assert len(data) == 2
+    for item in data:
+        assert "image_path" in item
+        assert "pred" in item
+        assert isinstance(item["pred"], int)
+        assert item["pred"] in (0, 1)
+        assert "probability" in item
+        assert "confidence" in item
+        assert "class_name" in item
+
+
+def test_cli_directory_inference_json_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify CLI directory inference writes compliant JSON with image_path and pred."""
+    from scripts.predict import main as cli_main
+
+    # Create dummy images in a directory
+    img_dir = tmp_path / "test_images"
+    img_dir.mkdir()
+    Image.new("RGB", (32, 32), color="white").save(img_dir / "sample1.jpg")
+    Image.new("RGB", (32, 32), color="black").save(img_dir / "sample2.png")
+
+    # Mock load_model_from_checkpoint in scripts.predict
+    monkeypatch.setattr(
+        "scripts.predict.load_model_from_checkpoint",
+        lambda *args, **kwargs: DummyBinaryClassifier(logit_value=-1.5),
+    )
+
+    dummy_model = tmp_path / "dummy_hybrid.pt"
+    dummy_model.write_bytes(b"dummy model")
+
+    out_json = tmp_path / "cli_predictions.json"
+    test_args = [
+        "predict.py",
+        "--image-dir",
+        str(img_dir),
+        "--model-path",
+        str(dummy_model),
+        "--threshold",
+        "0.5",
+        "--output",
+        str(out_json),
+        "--device",
+        "cpu",
+        "--quiet",
+    ]
+    monkeypatch.setattr("sys.argv", test_args)
+
+    exit_code = cli_main()
+    assert exit_code == 0
+    assert out_json.exists()
+
+    import json
+    records = json.loads(out_json.read_text(encoding="utf-8"))
+    assert len(records) == 2
+
+    for r in records:
+        assert "image_path" in r
+        assert "pred" in r
+        assert r["pred"] == 0  # logit -1.5 -> sigmoid ~ 0.1824 < 0.50 -> 0 (Authentic)
+        assert r["class_name"] == "Authentic"
+        assert r["probability"] < 0.25
+        assert r["confidence"] > 75.0
 

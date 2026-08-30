@@ -62,12 +62,16 @@ def predict_single_image(
     confidence = prob if pred_label == 1 else (1.0 - prob)
 
     return {
+        "image_path": str(image_path),
+        "pred": pred_label,
+        "probability": round(prob, 6),
+        "confidence": round(confidence * 100.0, 2),
+        "class_name": class_name,
+        "threshold": threshold,
         "filepath": str(image_path),
         "prediction": pred_label,
-        "class_name": class_name,
         "probability_synthetic": round(prob, 6),
         "confidence_pct": round(confidence * 100.0, 2),
-        "threshold": threshold,
     }
 
 
@@ -121,7 +125,7 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=Path,
         default=None,
-        help="Optional path to save batch predictions (.csv or .json).",
+        help="Output path for predictions (default: predictions.json). Supports .json or .csv.",
     )
     parser.add_argument(
         "--quiet",
@@ -204,23 +208,30 @@ def main() -> int:
 
         if not args.quiet:
             print("\nAnalysis Result:")
-            print(f"  File:           {res['filepath']}")
-            print(f"  Classification: {res['class_name'].upper()} (Class {res['prediction']})")
-            print(f"  Probability:    {res['probability_synthetic']:.4f} (Synthetic score)")
-            print(f"  Confidence:     {res['confidence_pct']:.1f}%")
+            print(f"  Image Path:     {res['image_path']}")
+            print(f"  Prediction:     {res['pred']} ({res['class_name']})")
+            print(f"  Probability:    {res['probability']:.4f} (Synthetic score)")
+            print(f"  Confidence:     {res['confidence']:.1f}%")
             print(f"  Inference Time: {elapsed:.1f} ms")
         else:
-            print(f"{res['class_name']},{res['probability_synthetic']:.6f}")
+            print(f"{res['class_name']},{res['pred']},{res['probability']:.6f}")
 
         if args.output is not None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
-            if args.output.suffix.lower() == ".json":
-                args.output.write_text(json.dumps([res], indent=2), encoding="utf-8")
-            else:
+            if args.output.suffix.lower() == ".csv":
                 with open(args.output, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=list(res.keys()))
+                    writer = csv.DictWriter(f, fieldnames=list(res.keys()), extrasaction="ignore")
                     writer.writeheader()
                     writer.writerow(res)
+            else:
+                json_record = {
+                    "image_path": res["image_path"],
+                    "pred": res["pred"],
+                    "probability": res["probability"],
+                    "confidence": res["confidence"],
+                    "class_name": res["class_name"],
+                }
+                args.output.write_text(json.dumps([json_record], indent=2), encoding="utf-8")
 
         return 0
 
@@ -272,11 +283,14 @@ def main() -> int:
                 conf = prob if pred_label == 1 else (1.0 - prob)
                 results.append(
                     {
+                        "image_path": str(p),
+                        "pred": pred_label,
+                        "probability": round(prob, 6),
+                        "confidence": round(conf * 100.0, 2),
+                        "class_name": class_name,
+                        "threshold": args.threshold,
                         "filepath": str(p),
                         "prediction": pred_label,
-                        "class_name": class_name,
-                        "probability": round(prob, 6),
-                        "confidence_pct": round(conf * 100.0, 2),
                     }
                 )
 
@@ -285,7 +299,7 @@ def main() -> int:
                 print(f"Processed {end:,}/{len(image_paths):,} images ({pct:.1f}%)...")
 
     elapsed = time.perf_counter() - t0
-    num_fake = sum(1 for r in results if r["prediction"] == 1)
+    num_fake = sum(1 for r in results if r["pred"] == 1)
     num_real = len(results) - num_fake
     throughput = len(results) / max(0.001, elapsed)
 
@@ -301,17 +315,34 @@ def main() -> int:
         print(f" Total Time:           {elapsed:.2f}s ({throughput:.1f} img/s)")
         print("=================================================================")
 
-    # Write output if specified
-    out_path = args.output or Path("predictions.csv")
+    # Write output (defaults to compliant JSON: predictions.json)
+    out_path = args.output or Path("predictions.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    if out_path.suffix.lower() == ".json":
-        out_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    else:
-        fieldnames = ["filepath", "probability", "prediction", "class_name", "confidence_pct"]
+    if out_path.suffix.lower() == ".csv":
+        fieldnames = [
+            "image_path",
+            "pred",
+            "probability",
+            "confidence",
+            "class_name",
+            "threshold",
+        ]
         with open(out_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(results)
+    else:
+        json_records = [
+            {
+                "image_path": r["image_path"],
+                "pred": r["pred"],
+                "probability": r["probability"],
+                "confidence": r["confidence"],
+                "class_name": r["class_name"],
+            }
+            for r in results
+        ]
+        out_path.write_text(json.dumps(json_records, indent=2), encoding="utf-8")
 
     if not args.quiet:
         print(f"Saved predictions to: {out_path}")
