@@ -187,33 +187,39 @@ feat(exp): complete Phase 4 FFT dual-branch experiment and Checkpoint 2
 
 ---
 
-## Phase 5: Final Robustness Evaluation & Held-Out Benchmark
+## Phase 5: Final Robustness Evaluation, Model Selection & Post-Phase 5 Ablations
 
 ### 5.1 Objective
-Execute comprehensive, rigorous evaluation of the final selected model across all required real-world transformations and severities, followed by a single-pass evaluation on the isolated held-out benchmark.
+Execute comprehensive, rigorous evaluation of the final selected model across all required real-world transformations and severities, followed by a single-pass evaluation on the isolated held-out benchmark. Conduct controlled ablations to explore potential model refinements while keeping the benchmark quarantined.
 
-### 5.2 Tasks
-- [ ] Implement comprehensive evaluation harness `scripts/evaluate_robustness.py`.
-- [ ] Run evaluation on clean validation set (Accuracy, AUROC, FPR).
-- [ ] Run evaluation across all 14 individual transformation conditions:
+### 5.2 Tasks & Milestones
+- [x] Implement comprehensive evaluation harness `scripts/evaluate_robustness.py`.
+- [x] Run evaluation on clean validation set (Accuracy 97.55%, AUROC 99.68%, FPR 2.50%).
+- [x] Run evaluation across all required transformation conditions (17 conditions total):
   - JPEG ($Q=90, 70, 50, 30$)
   - Gaussian Blur ($\sigma=0.5, 1.0, 2.0$)
   - Resize ($0.5\times, 0.25\times$)
   - Gaussian Noise ($\sigma=0.02, 0.05, 0.10$)
-  - Color Jitter ($\pm 20\%$)
+  - Color Jitter ($\pm 10\%, \pm 20\%$)
   - Center Crop ($80\%$)
-- [ ] Calculate robustness degradation curves for every distortion type.
-- [ ] Ingest and evaluate isolated held-out benchmark (COCO val2017 authentic + DALL-E Advanced synthetic).
-- [ ] Compile full results into `reports/final_robustness_benchmark.json` and Markdown summary.
+  - Composite Severe Transformation
+- [x] Calculate robustness degradation curves and worst-case floor across all conditions.
+- [x] Ingest and evaluate isolated held-out benchmark (4,998 COCO val2017 authentic + 8,843 DALL-E 3 synthetic).
+- [x] **Post-Phase 5 Controlled Ablation Experiments:**
+  - [x] **Canonical Threshold Calibration:** Evaluated clean validation score distributions fresh on GPU; generated single authoritative `reports/threshold_calibration.json`. Verified that $\theta = 0.50$ provides the highest worst-case robustness floor (95.55% at `noise_sigma0.10`), locking deployment threshold at 0.50.
+  - [x] **Hybrid V2 (Stage 2 Unfreezing + Label Smoothing + Flip):** Degraded noise robustness floor from $95.37\% \rightarrow 93.75\%$. REJECTED.
+  - [x] **Hybrid V3 (Clean Ablation: Label Smoothing + Flip):** Degraded clean accuracy to $96.80\%$ and mean transformed accuracy to $96.41\%$. REJECTED.
+  - [x] **Hybrid V4 (`pos_weight=1.35`):** Evaluated strictly on development split. Authoritative results: Clean Acc 96.53%, Clean FPR 2.07%, Mean Transformed Acc 96.03%, Worst-Case Floor 94.75%. Failed promotion gates (required $\ge 96.85\%$ mean trans acc, $\ge 95.20\%$ worst-case floor). REJECTED.
+- [x] **Final Model Locking:**
+  - **Champion Model:** `models/convnext_tiny_hybrid_fft.pt` (Hybrid V1, $\theta = 0.50$)
+  - **Fallback Model:** `models/convnext_tiny_robust_rgb.pt` (Robust RGB, $\theta = 0.50$)
+  - **Deployment Threshold:** Permanently locked at **0.50**
 
-### 5.3 Expected Outputs
-- `reports/final_robustness_benchmark.json` containing complete evaluation tables and metrics.
-- `reports/held_out_benchmark_results.json` containing final benchmark scores.
-
-### 5.4 Commit Message
-```text
-feat(eval): complete Phase 5 comprehensive robustness and held-out benchmark evaluation
-```
+### 5.3 Empirical Results
+- **Held-Out Benchmark ($N=13,841$):**
+  - Hybrid V1: AUROC **92.13%**, Overall Acc **68.34%**, COCO Acc **97.30%** (FPR **2.70%**), DALL-E 3 Recall **51.97%**.
+  - Robust RGB Fallback: AUROC **90.74%**, Overall Acc **66.79%**, COCO Acc **94.36%** (FPR **5.64%**), DALL-E 3 Recall **51.20%**.
+  - False alarm reduction on authentic photography: **52.1%** reduction ($5.64\% \rightarrow 2.70\%$).
 
 ---
 
@@ -223,62 +229,51 @@ feat(eval): complete Phase 5 comprehensive robustness and held-out benchmark eva
 Perform in-depth failure mode analysis to discover specific patterns where the model misclassifies imagery, breaking down performance by generator architecture, distortion level, and image characteristics.
 
 ### 6.2 Tasks
-- [ ] Implement error analysis diagnostic script `scripts/error_analysis.py`.
-- [ ] Breakdown False Positive (FP) cases: analyze which authentic images trigger false alarms.
-- [ ] Breakdown False Negative (FN) cases: analyze which generator architectures (DDPM, BigGAN, LDM, DALL-E, GLIDE) evade detection.
-- [ ] Correlate error rates with distortion severity (e.g., error rate vs. JPEG quality level).
-- [ ] Extract and save representative failure cases to `reports/failure_cases/`.
-- [ ] Compile comprehensive diagnostic report `reports/error_analysis_report.md`.
+- [x] Analyze False Positive (FP) cases on COCO ($2.70\%$, 135 images): high-contrast flash lighting, heavy in-camera noise, and shallow depth-of-field bokeh.
+- [x] Analyze False Negative (FN) cases on DALL-E 3 ($48.03\%$, 4,247 images): naturalistic landscapes, smooth architectural renders lacking high-frequency grid cues.
+- [x] Document the DALL-E 3 Generalization Gap: bimodal probability distribution (~55% high confidence, ~40% evasion) driven by latent diffusion transformer decoders lacking $32 \times 32$ upsampling artifacts.
+- [x] Correlate error rates with distortion severity (Gaussian noise $\sigma=0.10$ and downsampling $0.25\times$ represent principal degradation axes).
+- [x] Document spatial vs. frequency complementarity (FFT branch provided +82 unique correct predictions over pure RGB).
+- [x] Compile comprehensive forensic error analysis report `reports/error_analysis.md`.
 
 ### 6.3 Expected Outputs
-- `reports/error_analysis_report.md` with detailed breakdown tables and actionable insights.
-
-### 6.4 Commit Message
-```text
-feat(analysis): complete Phase 6 error analysis and failure mode breakdown
-```
+- `reports/error_analysis.md` with detailed breakdown tables and architectural insights.
 
 ---
 
 ## Phase 7: Standalone Inference Pipeline & CLI
 
 ### 7.1 Objective
-Package the final trained model into a self-contained, production-ready inference module and CLI that generates calibrated predictions and structured JSON outputs for single images or directories.
+Package the final trained model into a self-contained, production-ready inference module and CLI that generates calibrated predictions and structured outputs for single images or directories.
 
 ### 7.2 Tasks
-- [ ] Implement `src/verixa/inference.py` defining `VerixaPredictor` class with batching and automatic device detection.
-- [ ] Build standalone CLI `scripts/predict.py` supporting `--image`, `--dir`, `--output-json`, and `--threshold` flags.
-- [ ] Verify inference latency ($< 50\text{ ms}$ per image on RTX 4060 GPU).
-- [ ] Add unit and integration tests in `tests/test_inference.py`.
+- [x] Implement `src/verixa/inference.py` defining `VerixaPredictor` class with batching, auto-device detection, and CSV export.
+- [x] Build standalone production CLI `scripts/predict.py` supporting `--image`, `--image-dir`, `--manifest`, `--output`, and locked threshold $\theta = 0.50$.
+- [x] Build submission prediction generator `scripts/generate_submission.py`.
+- [x] Verify inference latency ($< 25\text{ ms}$ per image on RTX 4060 GPU).
+- [x] Add automated unit and integration tests in `tests/test_inference.py` (6 tests passing).
 
 ### 7.3 Expected Outputs
 - Working CLI `scripts/predict.py`.
-- Automated tests verifying deterministic JSON outputs across sample images.
-
-### 7.4 Commit Message
-```text
-feat(inference): complete Phase 7 standalone inference pipeline and CLI
-```
+- Reusable Python API `src/verixa/inference.py`.
+- Automated tests verifying deterministic prediction outputs.
 
 ---
 
-## Phase 8: Documentation, Polish & Submission Packaging
+## Phase 8: Documentation, Polish & Final Verification
 
 ### 8.1 Objective
-Polish all repository documentation, format benchmarks into GitHub markdown tables, verify total reproducibility from scratch, and prepare the final competition submission package.
+Polish all repository documentation, format benchmarks into clear GitHub markdown tables, verify total reproducibility from scratch, and prepare the repository for final competition evaluation.
 
 ### 8.2 Tasks
-- [ ] Update `README.md` with complete architecture diagrams, final benchmark tables, quickstart guide, and citation information.
-- [ ] Review and clean `requirements.txt` and `pyproject.toml`.
-- [ ] Verify fresh environment installation and run end-to-end smoke test.
-- [ ] Package final report summaries and presentation artifacts.
+- [x] Update `README.md` with complete architecture diagrams, final benchmark tables, quickstart guide, and citation information.
+- [x] Update `Phases.md` and `Memory.md` reflecting all experimental results, ablations, and locked checkpoints.
+- [x] Verify clean execution of complete test suite (`pytest -v`, 68/68 passing).
+- [x] Verify strict linter adherence (`ruff check .`, 100% clean).
+- [x] Verify Git integrity: no benchmark data, temporary caches, or prediction dumps committed.
+- [x] Confirm locked champion (`models/convnext_tiny_hybrid_fft.pt`) and fallback (`models/convnext_tiny_robust_rgb.pt`) checkpoints are unmodified.
 
 ### 8.3 Expected Outputs
 - Polished, comprehensive `README.md`.
-- Verified, fully reproducible repository ready for judging and evaluation.
-
-### 8.4 Commit Message
-```text
-docs(polish): complete Phase 8 documentation, report summaries, and submission polish
-```
+- Verified, fully reproducible repository ready for final judging and evaluation.
 
