@@ -1,6 +1,6 @@
 # Verixa: Forensic AI-Generated Image Detection Under Real-World Transformations
 
-[![CI / Quality Checks](https://img.shields.io/badge/pytest-68%20passed-brightgreen.svg)]()
+[![CI / Quality Checks](https://img.shields.io/badge/pytest-69%20passed-brightgreen.svg)]()
 [![Code Style](https://img.shields.io/badge/code%20style-ruff-000000.svg)]()
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6%20%2B%20CUDA-EE4C2C.svg)]()
 [![Model](https://img.shields.io/badge/Architecture-Hybrid%20ConvNeXt--Tiny%20%2B%202D%20FFT-blue.svg)]()
@@ -62,7 +62,7 @@ All development evaluations are executed on a fixed, leak-free **6,001-image val
 | Model Configuration | Status | Clean Acc | Clean AUROC | Clean FPR | Mean Transformed Acc (16 Conds) | Worst-Case Floor | Composite Severe Acc |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Phase 2 Clean Baseline** | Ablation Baseline | 97.03% | 99.64% | 2.80% | 88.34% | 60.71% (`noise_0.10`) | 89.12% |
-| **Phase 3 Robust RGB** | **Locked Fallback** | 96.83% | 99.64% | 2.53% | 96.11% | 94.33% (`resize_0.25`) | 96.33% |
+| **Phase 3 Robust RGB** | **Locked Fallback** | 96.83% | 99.64% | 2.53% | 96.11% | 94.33% (`resize_0.25`) | 95.92% |
 | **Hybrid V1 (RGB + FFT)** | **Champion Model** | **97.55%** | **99.68%** | **2.50%** | **96.95%** | **95.37%** (`noise_0.10`) | **97.05%** |
 | **Hybrid V2** (Unfreeze S2+LS+Flip) | Rejected Candidate | 97.57% | 99.67% | 1.83% | 96.51% | 93.75% (`noise_0.10`) | 96.52% |
 | **Hybrid V3** (Clean Ablation: LS+Flip) | Rejected Candidate | 96.80% | 99.65% | 3.77% | 96.41% | 94.55% (`noise_0.10`) | 96.48% |
@@ -115,9 +115,18 @@ conda activate verixa
 pip install -e .
 ```
 
+> [!IMPORTANT]
+> **Model Checkpoint Setup (Required Before Inference):**  
+> Trained model weights (`*.pt`, ~258 MB) exceed GitHub's standard file size limits and are intentionally excluded from Git tracking via `.gitignore`. After cloning, the `models/` directory contains only `models/.gitkeep`.  
+> 
+> To perform inference, the trained Champion checkpoint must be obtained separately and placed at:  
+> `models/convnext_tiny_hybrid_fft.pt`  
+> 
+> The inference script (`scripts/predict.py`) requires this checkpoint file to exist at that exact path before it can run.
+
 ### 1. Single-Image Inference CLI
 
-Run inference on any image using the locked Hybrid V1 champion model:
+Once the checkpoint is placed in `models/convnext_tiny_hybrid_fft.pt`, run inference on any image using the locked Hybrid V1 champion model:
 
 ```powershell
 python scripts/predict.py --image path/to/image.jpg
@@ -141,9 +150,18 @@ Analysis Result:
   Inference Time: 18.4 ms
 ```
 
-### 2. Batch Directory Inference (Image Directory → `predictions.json`)
+### 2. Batch Directory Inference & Official Demo (`demo_images/` → `demo_output.json`)
 
-Process an entire folder of evaluation images with GPU batch acceleration. By default, this generates a competition-compliant JSON file containing `image_path` and `pred` for every image:
+Verixa includes a public suite of demonstration images ([`demo_images/`](demo_images/)) covering authentic photographs, AI-generated images, and compressed variants. To evaluate the entire directory in batch and produce the official competition-compliant JSON output:
+
+```powershell
+python scripts/predict.py `
+  --image-dir demo_images `
+  --batch-size 32 `
+  --output demo_output.json
+```
+
+Or evaluate any arbitrary image folder:
 
 ```powershell
 python scripts/predict.py `
@@ -152,21 +170,21 @@ python scripts/predict.py `
   --output predictions.json
 ```
 
-**JSON Output Format (`predictions.json`):**
+**JSON Output Format (`predictions.json` / `demo_output.json`):**
 ```json
 [
   {
-    "image_path": "path/to/images/sample1.jpg",
+    "image_path": "demo_images/1.png",
     "pred": 0,
-    "probability": 0.000123,
+    "probability": 0.000043,
     "confidence": 99.99,
     "class_name": "Authentic"
   },
   {
-    "image_path": "path/to/images/sample2.png",
+    "image_path": "demo_images/2.png",
     "pred": 1,
-    "probability": 0.998741,
-    "confidence": 99.87,
+    "probability": 0.994141,
+    "confidence": 99.41,
     "class_name": "AI-Generated"
   }
 ]
@@ -206,12 +224,31 @@ To reproduce all experimental results from raw data to final evaluation:
 python scripts/inspect_datasets.py --out reports/dataset_inspection.json
 
 # 2. Ingest CIFAKE and SID_Set (30,000 processed images)
-python scripts/ingest_local_dataset.py --root data/raw/cifake --source-dataset CIFAKE --limit-per-class 7500
-python scripts/ingest_hf_dataset.py --dataset-id "competitions/sid_set" --source-dataset SID_Set --limit-per-class 7500
+python scripts/ingest_local_dataset.py `
+  --root data/raw/cifake `
+  --source-dataset CIFAKE `
+  --label-map config/cifake_label_map.json `
+  --output-root data/processed/cifake `
+  --manifest data/manifests/cifake_manifest.csv
+
+python scripts/ingest_hf_dataset.py `
+  --dataset saberzl/SID_Set `
+  --source-dataset SID_Set `
+  --label-map config/sid_set_label_map.binary.json `
+  --output-root data/processed/sid_set `
+  --manifest data/manifests/sid_set_manifest.csv `
+  --limit-per-label 2500
 
 # 3. Deterministic deduplication and fixed split (seed 1337)
-python scripts/detect_duplicates.py --manifest data/manifests/merged_manifest.csv
-python scripts/create_fixed_split.py --manifest data/manifests/merged_manifest.csv --train-ratio 0.8 --seed 1337
+python scripts/detect_duplicates.py `
+  --manifest data/manifests/merged_manifest.csv `
+  --out reports/final_30k_dedupe_report.json
+
+python scripts/create_fixed_split.py `
+  --manifest data/manifests/merged_manifest.csv `
+  --out data/manifests/merged_manifest.csv `
+  --val-fraction 0.2 `
+  --seed 1337
 
 # 4. Train Champion Hybrid V1
 python scripts/train_hybrid.py `
@@ -243,24 +280,18 @@ ruff check .
 C:\Verixa\
 ├── config/                     # Dataset schemas and label mapping configurations
 ├── data/
-│   ├── manifests/              # Leakage-checked CSV manifests (merged_manifest.csv)
-│   └── processed/              # Resized 224x224 JPEG images (gitignored)
+│   ├── manifests/              # CSV manifests (merged_manifest.csv, seed 1337, local)
+│   └── processed/              # Resized 224x224 JPEG images (local, gitignored)
+├── demo_images/                # Public test suite of authentic, AI, & compressed images
+├── demo_output.json            # Official JSON output demonstration
 ├── models/
-│   ├── convnext_tiny_hybrid_fft.pt      # PRIMARY CHAMPION CHECKPOINT (Epoch 6)
-│   ├── convnext_tiny_robust_rgb.pt      # LOCKED FALLBACK CHECKPOINT (Epoch 3)
-│   ├── convnext_tiny_hybrid_v2.pt       # Preserved negative result (Stage 2 unfreeze)
-│   ├── convnext_tiny_hybrid_v3.pt       # Preserved negative result (LS + Flip)
-│   └── convnext_tiny_hybrid_v4_weighted.pt # Preserved negative result (pos_weight=1.35)
+│   ├── convnext_tiny_hybrid_fft.pt      # PRIMARY CHAMPION CHECKPOINT (obtained separately)
+│   └── convnext_tiny_robust_rgb.pt      # LOCKED FALLBACK CHECKPOINT (obtained separately)
 ├── reports/
-│   ├── threshold_calibration.json       # Authoritative canonical threshold analysis
-│   ├── error_analysis.md                # Phase 6 comprehensive forensic error report
-│   ├── final_hybrid_robustness_report.json # 17-condition champion robustness metrics
-│   └── held_out_benchmark_results.json  # Frozen held-out benchmark results
+│   └── .gitkeep                # Evaluation JSON reports generated locally during runs (gitignored)
 ├── scripts/
 │   ├── predict.py                       # Production CLI inference entrypoint
 │   ├── generate_submission.py           # Competition submission generator
-│   ├── evaluate_robustness.py           # 17-condition evaluation harness
-│   ├── compute_canonical_thresholds.py  # Canonical threshold calibration tool
 │   ├── train_hybrid.py                  # Hybrid V1 champion training script
 │   └── train_rgb.py                     # Robust RGB training script
 ├── src/verixa/
@@ -276,7 +307,7 @@ C:\Verixa\
 │       ├── augmentations.py            # Transformation-aware distortion augmentations
 │       ├── dataset.py                  # PyTorch Dataset and DataLoader factories
 │       └── trainer.py                  # Training engine with AMP, early stopping, VRAM logs
-├── tests/                              # 68 automated unit tests (100% passing)
+├── tests/                              # 69 automated unit tests (100% passing)
 ├── Phases.md                           # Detailed 8-phase project execution log
 ├── Rules.md                            # Engineering standards and hardware constraints
 └── README.md                           # Master project documentation
