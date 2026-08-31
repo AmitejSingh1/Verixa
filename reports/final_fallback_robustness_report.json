@@ -1,0 +1,314 @@
+{
+  "comparison": {},
+  "device": "cuda",
+  "manifest": "data\\manifests\\merged_manifest.csv",
+  "model_path": "models\\convnext_tiny_robust_rgb.pt",
+  "results": {
+    "blur_sigma0.5": {
+      "accuracy": 0.9692,
+      "auroc": 0.9967,
+      "confusion_matrix": {
+        "false_negatives": 115,
+        "false_positives": 70,
+        "true_negatives": 2930,
+        "true_positives": 2886
+      },
+      "delta_acc_from_clean": -0.0009,
+      "delta_auroc_from_clean": -0.0003,
+      "fnr": 0.0383,
+      "fpr": 0.0233,
+      "fpr_at_95_tpr": 0.0153,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.0966
+    },
+    "blur_sigma1.0": {
+      "accuracy": 0.9673,
+      "auroc": 0.9962,
+      "confusion_matrix": {
+        "false_negatives": 126,
+        "false_positives": 70,
+        "true_negatives": 2930,
+        "true_positives": 2875
+      },
+      "delta_acc_from_clean": 0.001,
+      "delta_auroc_from_clean": 0.0002,
+      "fnr": 0.042,
+      "fpr": 0.0233,
+      "fpr_at_95_tpr": 0.017,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1048
+    },
+    "blur_sigma2.0": {
+      "accuracy": 0.9523,
+      "auroc": 0.9924,
+      "confusion_matrix": {
+        "false_negatives": 172,
+        "false_positives": 114,
+        "true_negatives": 2886,
+        "true_positives": 2829
+      },
+      "delta_acc_from_clean": 0.016,
+      "delta_auroc_from_clean": 0.004,
+      "fnr": 0.0573,
+      "fpr": 0.038,
+      "fpr_at_95_tpr": 0.0427,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1518
+    },
+    "clean": {
+      "accuracy": 0.9683,
+      "auroc": 0.9964,
+      "confusion_matrix": {
+        "false_negatives": 114,
+        "false_positives": 76,
+        "true_negatives": 2924,
+        "true_positives": 2887
+      },
+      "delta_acc_from_clean": 0.0,
+      "delta_auroc_from_clean": 0.0,
+      "fnr": 0.038,
+      "fpr": 0.0253,
+      "fpr_at_95_tpr": 0.0157,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.0991
+    },
+    "composite_severe": {
+      "accuracy": 0.9592,
+      "auroc": 0.9941,
+      "confusion_matrix": {
+        "false_negatives": 155,
+        "false_positives": 90,
+        "true_negatives": 2910,
+        "true_positives": 2846
+      },
+      "delta_acc_from_clean": 0.0091,
+      "delta_auroc_from_clean": 0.0023,
+      "fnr": 0.0516,
+      "fpr": 0.03,
+      "fpr_at_95_tpr": 0.0307,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1323
+    },
+    "crop_fraction0.80": {
+      "accuracy": 0.9538,
+      "auroc": 0.9943,
+      "confusion_matrix": {
+        "false_negatives": 221,
+        "false_positives": 56,
+        "true_negatives": 2944,
+        "true_positives": 2780
+      },
+      "delta_acc_from_clean": 0.0145,
+      "delta_auroc_from_clean": 0.0021,
+      "fnr": 0.0736,
+      "fpr": 0.0187,
+      "fpr_at_95_tpr": 0.0347,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1591
+    },
+    "jitter_pm10": {
+      "accuracy": 0.9645,
+      "auroc": 0.9962,
+      "confusion_matrix": {
+        "false_negatives": 161,
+        "false_positives": 52,
+        "true_negatives": 2948,
+        "true_positives": 2840
+      },
+      "delta_acc_from_clean": 0.0038,
+      "delta_auroc_from_clean": 0.0002,
+      "fnr": 0.0536,
+      "fpr": 0.0173,
+      "fpr_at_95_tpr": 0.0213,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1175
+    },
+    "jitter_pm20": {
+      "accuracy": 0.9548,
+      "auroc": 0.9958,
+      "confusion_matrix": {
+        "false_negatives": 236,
+        "false_positives": 35,
+        "true_negatives": 2965,
+        "true_positives": 2765
+      },
+      "delta_acc_from_clean": 0.0135,
+      "delta_auroc_from_clean": 0.0006,
+      "fnr": 0.0786,
+      "fpr": 0.0117,
+      "fpr_at_95_tpr": 0.0223,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.148
+    },
+    "jpeg_q30": {
+      "accuracy": 0.96,
+      "auroc": 0.9942,
+      "confusion_matrix": {
+        "false_negatives": 164,
+        "false_positives": 76,
+        "true_negatives": 2924,
+        "true_positives": 2837
+      },
+      "delta_acc_from_clean": 0.0083,
+      "delta_auroc_from_clean": 0.0022,
+      "fnr": 0.0546,
+      "fpr": 0.0253,
+      "fpr_at_95_tpr": 0.028,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1362
+    },
+    "jpeg_q50": {
+      "accuracy": 0.9622,
+      "auroc": 0.9953,
+      "confusion_matrix": {
+        "false_negatives": 152,
+        "false_positives": 75,
+        "true_negatives": 2925,
+        "true_positives": 2849
+      },
+      "delta_acc_from_clean": 0.0061,
+      "delta_auroc_from_clean": 0.0011,
+      "fnr": 0.0506,
+      "fpr": 0.025,
+      "fpr_at_95_tpr": 0.0253,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1195
+    },
+    "jpeg_q70": {
+      "accuracy": 0.968,
+      "auroc": 0.9958,
+      "confusion_matrix": {
+        "false_negatives": 117,
+        "false_positives": 75,
+        "true_negatives": 2925,
+        "true_positives": 2884
+      },
+      "delta_acc_from_clean": 0.0003,
+      "delta_auroc_from_clean": 0.0006,
+      "fnr": 0.039,
+      "fpr": 0.025,
+      "fpr_at_95_tpr": 0.018,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1081
+    },
+    "jpeg_q90": {
+      "accuracy": 0.9683,
+      "auroc": 0.9964,
+      "confusion_matrix": {
+        "false_negatives": 114,
+        "false_positives": 76,
+        "true_negatives": 2924,
+        "true_positives": 2887
+      },
+      "delta_acc_from_clean": 0.0,
+      "delta_auroc_from_clean": 0.0,
+      "fnr": 0.038,
+      "fpr": 0.0253,
+      "fpr_at_95_tpr": 0.015,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.0988
+    },
+    "noise_sigma0.02": {
+      "accuracy": 0.9637,
+      "auroc": 0.9952,
+      "confusion_matrix": {
+        "false_negatives": 80,
+        "false_positives": 138,
+        "true_negatives": 2862,
+        "true_positives": 2921
+      },
+      "delta_acc_from_clean": 0.0046,
+      "delta_auroc_from_clean": 0.0012,
+      "fnr": 0.0267,
+      "fpr": 0.046,
+      "fpr_at_95_tpr": 0.025,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1123
+    },
+    "noise_sigma0.05": {
+      "accuracy": 0.9587,
+      "auroc": 0.9929,
+      "confusion_matrix": {
+        "false_negatives": 115,
+        "false_positives": 133,
+        "true_negatives": 2867,
+        "true_positives": 2886
+      },
+      "delta_acc_from_clean": 0.0096,
+      "delta_auroc_from_clean": 0.0035,
+      "fnr": 0.0383,
+      "fpr": 0.0443,
+      "fpr_at_95_tpr": 0.031,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1286
+    },
+    "noise_sigma0.10": {
+      "accuracy": 0.9438,
+      "auroc": 0.9881,
+      "confusion_matrix": {
+        "false_negatives": 184,
+        "false_positives": 153,
+        "true_negatives": 2847,
+        "true_positives": 2817
+      },
+      "delta_acc_from_clean": 0.0245,
+      "delta_auroc_from_clean": 0.0083,
+      "fnr": 0.0613,
+      "fpr": 0.051,
+      "fpr_at_95_tpr": 0.0627,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1577
+    },
+    "resize_scale0.25": {
+      "accuracy": 0.9433,
+      "auroc": 0.9896,
+      "confusion_matrix": {
+        "false_negatives": 222,
+        "false_positives": 118,
+        "true_negatives": 2882,
+        "true_positives": 2779
+      },
+      "delta_acc_from_clean": 0.025,
+      "delta_auroc_from_clean": 0.0068,
+      "fnr": 0.074,
+      "fpr": 0.0393,
+      "fpr_at_95_tpr": 0.0523,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1878
+    },
+    "resize_scale0.50": {
+      "accuracy": 0.9645,
+      "auroc": 0.995,
+      "confusion_matrix": {
+        "false_negatives": 114,
+        "false_positives": 99,
+        "true_negatives": 2901,
+        "true_positives": 2887
+      },
+      "delta_acc_from_clean": 0.0038,
+      "delta_auroc_from_clean": 0.0014,
+      "fnr": 0.038,
+      "fpr": 0.033,
+      "fpr_at_95_tpr": 0.025,
+      "threshold": 0.5,
+      "total_samples": 6001,
+      "val_loss": 0.1147
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "authentic_count": 4998,
+  "benchmark_dir": "benchmark_dataset",
+  "elapsed_seconds": 184.79,
+  "metrics": {
+    "accuracy": 0.6834,
+    "auroc": 0.9213,
+    "confusion_matrix": {
+      "false_negatives": 4247,
+      "false_positives": 135,
+      "true_negatives": 4863,
+      "true_positives": 4596
+    },
+    "fnr": 0.4803,
+    "fpr": 0.027,
+    "fpr_at_95_tpr": 0.3599,
+    "threshold": 0.5,
+    "total_samples": 13841
+  },
+  "model_path": "models\\convnext_tiny_hybrid_fft.pt",
+  "per_class": {
+    "authentic_coco_accuracy": 0.973,
+    "synthetic_dalle_accuracy": 0.5197
+  },
+  "synthetic_count": 8843,
+  "threshold": 0.5,
+  "throughput_images_per_s": 74.9,
+  "total_images": 13841
+}

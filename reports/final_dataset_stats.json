@@ -1,0 +1,38 @@
+{
+  "actual_disk_usage_mb": 307.89,
+  "cross_split_leakage": 0,
+  "exact_duplicate_groups": 22,
+  "label_counts": {
+    "0": 15000,
+    "1": 15000
+  },
+  "seed": 1337,
+  "source_counts": {
+    "CIFAKE": 15000,
+    "SID_Set": 15000
+  },
+  "split_counts": {
+    "train": 23999,
+    "val": 6001
+  },
+  "stratum_split_counts": {
+    "0|CIFAKE|": {
+      "train": 6000,
+      "val": 1500
+    },
+    "0|SID_Set|": {
+      "train": 6000,
+      "val": 1500
+    },
+    "1|CIFAKE|": {
+      "train": 5999,
+      "val": 1501
+    },
+    "1|SID_Set|": {
+      "train": 6000,
+      "val": 1500
+    }
+  },
+  "total_images": 30000,
+  "val_fraction": 0.2
+}
