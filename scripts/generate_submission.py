@@ -1,12 +1,13 @@
-"""CLI script to generate submission prediction CSVs for arbitrary evaluation sets.
+"""CLI script to generate submission prediction JSON for arbitrary evaluation sets.
 
-Computes calibrated probabilities and binary classifications using any trained
-checkpoint (Hybrid RGB+FFT, Robust RGB, or Baseline).
+Computes calibrated probabilities using any trained checkpoint (Hybrid RGB+FFT,
+Robust RGB, or Baseline).
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
 import torch
@@ -54,8 +55,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("predictions.csv"),
-        help="Output CSV path.",
+        default=Path("predictions.json"),
+        help="Output JSON path.",
     )
     parser.add_argument(
         "--split",
@@ -118,7 +119,7 @@ def main() -> int:
         ]
     )
 
-    results: list[dict[str, str | float | int]] = []
+    results: list[dict[str, str | float]] = []
     total_batches = (len(image_paths) + args.batch_size - 1) // args.batch_size
 
     with torch.no_grad():
@@ -142,12 +143,11 @@ def main() -> int:
                 probs = [probs]
 
             for p, prob in zip(batch_paths, probs, strict=True):
-                pred_label = 1 if prob >= args.threshold else 0
+                clean_path = str(p).replace("\\", "/")
                 results.append(
                     {
-                        "filepath": str(p),
-                        "probability": round(prob, 6),
-                        "prediction": pred_label,
+                        "image_path": clean_path,
+                        "pred": round(float(prob), 6),
                     }
                 )
 
@@ -156,10 +156,8 @@ def main() -> int:
                 print(f"Processed {end:,}/{len(image_paths):,} images ({pct:.1f}%)")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.output, mode="w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["filepath", "probability", "prediction"])
-        writer.writeheader()
-        writer.writerows(results)
+    with open(args.output, mode="w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
 
     print(f"\nSuccessfully generated submission file: {args.output}")
     return 0
