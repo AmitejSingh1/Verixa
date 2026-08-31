@@ -280,18 +280,26 @@ ruff check .
 C:\Verixa\
 ├── config/                     # Dataset schemas and label mapping configurations
 ├── data/
-│   ├── manifests/              # CSV manifests (merged_manifest.csv, seed 1337, local)
-│   └── processed/              # Resized 224x224 JPEG images (local, gitignored)
+│   └── .gitkeep                # Data directory root (processed images & manifests gitignored)
 ├── demo_images/                # Public test suite of authentic, AI, & compressed images
 ├── demo_output.json            # Official JSON output demonstration
 ├── models/
-│   ├── convnext_tiny_hybrid_fft.pt      # PRIMARY CHAMPION CHECKPOINT (obtained separately)
-│   └── convnext_tiny_robust_rgb.pt      # LOCKED FALLBACK CHECKPOINT (obtained separately)
+│   ├── .gitkeep
+│   └── convnext_tiny_hybrid_fft.pt      # PRIMARY CHAMPION CHECKPOINT (tracked via Git LFS)
 ├── reports/
-│   └── .gitkeep                # Evaluation JSON reports generated locally during runs (gitignored)
+│   ├── .gitkeep
+│   ├── error_analysis.md                # Phase 6 comprehensive forensic error report
+│   ├── final_dataset_stats.json         # 30K dataset composition and leak-free split proof
+│   ├── final_fallback_robustness_report.json # 17-condition robust RGB fallback metrics
+│   ├── final_hybrid_robustness_report.json   # 17-condition champion robustness metrics
+│   ├── held_out_benchmark_hybrid_eval.json   # Held-out benchmark evaluation metrics
+│   ├── robustness_summary.md            # Multi-condition evaluation summary and comparison
+│   └── threshold_calibration.json       # Authoritative canonical threshold analysis
 ├── scripts/
 │   ├── predict.py                       # Production CLI inference entrypoint
 │   ├── generate_submission.py           # Competition submission generator
+│   ├── evaluate_robustness.py           # 17-condition evaluation harness
+│   ├── compute_canonical_thresholds.py  # Canonical threshold calibration tool
 │   ├── train_hybrid.py                  # Hybrid V1 champion training script
 │   └── train_rgb.py                     # Robust RGB training script
 ├── src/verixa/
